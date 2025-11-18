@@ -61,38 +61,70 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function syncStateFromBackground() {
-  // Request current state from background script
-  try {
-    const response = await chrome.runtime.sendMessage({ action: 'getState' });
-    if (response && response.state) {
-      // Update local state with background state
-      if (response.state.isRunning !== undefined) {
-        state.isProcessing = response.state.isRunning;
+  // Request current state from background script with retry logic
+  const maxRetries = 3;
+  const retryDelay = 500; // 500ms between retries
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Check if runtime is available
+      if (!chrome.runtime || !chrome.runtime.id) {
+        console.log('Chrome runtime not available');
+        break;
       }
-      if (response.state.isPaused !== undefined) {
-        state.isPaused = response.state.isPaused;
-      }
-      if (response.state.completedTasks !== undefined) {
-        state.completedTasks = response.state.completedTasks;
-      }
-      if (response.state.totalTasks !== undefined) {
-        state.totalTasks = response.state.totalTasks;
-      }
-      if (response.state.prompts && response.state.prompts.length > 0) {
-        state.prompts = response.state.prompts;
-        // Update textarea if prompts exist
-        if (elements.promptInput && state.prompts.length > 0) {
-          elements.promptInput.value = state.prompts.join('\n');
+      
+      // Send message with promise wrapper
+      const response = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ action: 'getState' }, (response) => {
+          // Check for runtime errors
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve(response);
+        });
+      });
+      
+      if (response && response.state) {
+        // Update local state with background state
+        if (response.state.isRunning !== undefined) {
+          state.isProcessing = response.state.isRunning;
         }
+        if (response.state.isPaused !== undefined) {
+          state.isPaused = response.state.isPaused;
+        }
+        if (response.state.completedTasks !== undefined) {
+          state.completedTasks = response.state.completedTasks;
+        }
+        if (response.state.totalTasks !== undefined) {
+          state.totalTasks = response.state.totalTasks;
+        }
+        if (response.state.prompts && response.state.prompts.length > 0) {
+          state.prompts = response.state.prompts;
+          // Update textarea if prompts exist
+          if (elements.promptInput && state.prompts.length > 0) {
+            elements.promptInput.value = state.prompts.join('\n');
+          }
+        }
+        if (response.state.type) {
+          state.selectedType = response.state.type;
+          selectType(response.state.type);
+        }
+        // Success - exit retry loop
+        return;
       }
-      if (response.state.type) {
-        state.selectedType = response.state.type;
-        selectType(response.state.type);
+    } catch (error) {
+      // Log error but continue with retry
+      if (attempt < maxRetries - 1) {
+        console.log(`Could not sync state from background (attempt ${attempt + 1}/${maxRetries}):`, error.message);
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      } else {
+        // Final attempt failed - log but don't throw
+        console.log('Could not sync state from background after retries:', error.message);
+        // This is not critical - extension can still work without syncing state
       }
     }
-  } catch (error) {
-    // Background script might not be ready, ignore
-    console.log('Could not sync state from background:', error);
   }
 }
 
@@ -288,13 +320,27 @@ async function handleStart() {
     state.isProcessing = true;
     state.isPaused = false;
     
-    // Send message to background script
-    chrome.runtime.sendMessage({
-      action: 'start',
-      prompts: state.prompts,
-      type: state.selectedType,
-      settings: settings
-    });
+    // Send message to background script with error handling
+    try {
+      chrome.runtime.sendMessage({
+        action: 'start',
+        prompts: state.prompts,
+        type: state.selectedType,
+        settings: settings
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('Error sending start message:', chrome.runtime.lastError.message);
+          if (typeof toastManager !== 'undefined') {
+            toastManager.error('Lỗi kết nối với background script. Vui lòng reload extension.');
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error sending start message:', error);
+      if (typeof toastManager !== 'undefined') {
+        toastManager.error('Lỗi khi gửi lệnh bắt đầu: ' + error.message);
+      }
+    }
     
     addLog('info', getText('logStarting'));
     if (typeof toastManager !== 'undefined') {
@@ -314,7 +360,15 @@ function handlePause() {
   setButtonLoading(elements.pauseBtn, true);
   
   state.isPaused = true;
-  chrome.runtime.sendMessage({ action: 'pause' });
+  try {
+    chrome.runtime.sendMessage({ action: 'pause' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error sending pause message:', chrome.runtime.lastError.message);
+      }
+    });
+  } catch (error) {
+    console.error('Error sending pause message:', error);
+  }
   addLog('warning', getText('logPaused'));
   
   if (typeof toastManager !== 'undefined') {
@@ -331,7 +385,15 @@ function handleResume() {
   setButtonLoading(elements.resumeBtn, true);
   
   state.isPaused = false;
-  chrome.runtime.sendMessage({ action: 'resume' });
+  try {
+    chrome.runtime.sendMessage({ action: 'resume' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error sending resume message:', chrome.runtime.lastError.message);
+      }
+    });
+  } catch (error) {
+    console.error('Error sending resume message:', error);
+  }
   addLog('info', getText('logResumed'));
   
   if (typeof toastManager !== 'undefined') {
@@ -349,7 +411,15 @@ function handleStop() {
   
   state.isProcessing = false;
   state.isPaused = false;
-  chrome.runtime.sendMessage({ action: 'stop' });
+  try {
+    chrome.runtime.sendMessage({ action: 'stop' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error sending stop message:', chrome.runtime.lastError.message);
+      }
+    });
+  } catch (error) {
+    console.error('Error sending stop message:', error);
+  }
   addLog('warning', getText('logStopped'));
   
   if (typeof toastManager !== 'undefined') {

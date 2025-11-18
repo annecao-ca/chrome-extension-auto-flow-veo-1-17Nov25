@@ -45,6 +45,33 @@ body > * {
   z-index: 1;
 }
 
+/* Futuristic Dashboard Theme */
+.theme-futuristic {
+  background: linear-gradient(
+    135deg,
+    #0f172a 0%,
+    #1e293b 50%,
+    #0f172a 100%
+  );
+}
+
+.theme-futuristic::before {
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.05) 0%, transparent 70%);
+  animation: futuristic-glow 8s ease-in-out infinite alternate;
+}
+
+@keyframes futuristic-glow {
+  0% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
 .container {
   padding: var(--spacing-lg);
 }
@@ -66,6 +93,31 @@ body > * {
   font-weight: var(--font-weight-semibold);
   color: var(--color-primary);
   line-height: var(--line-height-tight);
+}
+
+/* Futuristic Dashboard Theme - Title with glow */
+.theme-futuristic .title {
+  color: var(--color-primary);
+  text-shadow: 
+    0 0 10px var(--color-primary-glow),
+    0 0 20px var(--color-primary-glow),
+    0 0 30px var(--color-primary-glow);
+  animation: title-pulse 3s ease-in-out infinite;
+}
+
+@keyframes title-pulse {
+  0%, 100% {
+    text-shadow: 
+      0 0 10px var(--color-primary-glow),
+      0 0 20px var(--color-primary-glow),
+      0 0 30px var(--color-primary-glow);
+  }
+  50% {
+    text-shadow: 
+      0 0 15px var(--color-primary-glow),
+      0 0 30px var(--color-primary-glow),
+      0 0 45px var(--color-primary-glow);
+  }
 }
 
 .lang-toggle {
@@ -103,6 +155,26 @@ body > * {
   box-shadow: var(--card-shadow-hover);
 }
 
+/* Futuristic Dashboard Theme - Dark Cards */
+.theme-futuristic .section {
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(6, 182, 212, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.theme-futuristic .section:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow: 
+    0 12px 48px rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(6, 182, 212, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
 .section label {
   display: block;
   margin-bottom: var(--spacing-sm);
@@ -127,6 +199,25 @@ body > * {
   background: var(--color-bg-primary);
   transition: var(--input-transition);
   line-height: var(--line-height-normal);
+}
+
+/* Futuristic Dashboard Theme - Inputs */
+.theme-futuristic .prompt-input,
+.theme-futuristic .setting-input {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: var(--color-text-primary);
+}
+
+.theme-futuristic .prompt-input:focus,
+.theme-futuristic .setting-input:focus {
+  border-color: rgba(6, 182, 212, 0.6);
+  box-shadow: 
+    0 0 0 3px rgba(6, 182, 212, 0.2),
+    0 0 20px rgba(6, 182, 212, 0.1);
+  background: rgba(15, 23, 42, 0.8);
 }
 
 .prompt-input {
@@ -405,6 +496,31 @@ body > * {
   border-radius: var(--radius-full);
 }
 
+/* Futuristic Dashboard Theme - Progress Bar */
+.theme-futuristic .progress-bar {
+  background: linear-gradient(90deg, #06b6d4, #8b5cf6);
+  box-shadow: 
+    0 0 10px rgba(6, 182, 212, 0.5),
+    0 0 20px rgba(139, 92, 246, 0.3);
+}
+
+.theme-futuristic .progress-bar.active {
+  animation: progress-glow 2s ease-in-out infinite;
+}
+
+@keyframes progress-glow {
+  0%, 100% {
+    box-shadow: 
+      0 0 10px rgba(6, 182, 212, 0.5),
+      0 0 20px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    box-shadow: 
+      0 0 20px rgba(6, 182, 212, 0.8),
+      0 0 40px rgba(139, 92, 246, 0.5);
+  }
+}
+
 /* ============================================
    LOG
    ============================================ */
@@ -426,6 +542,37 @@ body > * {
   font-size: var(--font-size-sm);
   line-height: var(--line-height-relaxed);
   border: 1px solid #334155;
+}
+
+/* Futuristic Dashboard Theme - Log Area */
+.theme-futuristic .log-area {
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  box-shadow: 
+    inset 0 0 20px rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(6, 182, 212, 0.1);
+}
+
+.theme-futuristic .log-entry.info {
+  color: #06b6d4;
+  text-shadow: 0 0 5px rgba(6, 182, 212, 0.5);
+}
+
+.theme-futuristic .log-entry.success {
+  color: #10b981;
+  text-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+}
+
+.theme-futuristic .log-entry.warning {
+  color: #f59e0b;
+  text-shadow: 0 0 5px rgba(245, 158, 11, 0.5);
+}
+
+.theme-futuristic .log-entry.error {
+  color: #ef4444;
+  text-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
 }
 
 .log-entry {
@@ -1351,6 +1498,84 @@ body > * {
   /* Text color */
   color: var(--color-text-primary);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Futuristic Dashboard Theme - Buttons with glow */
+.theme-futuristic .btn-glass {
+  background: rgba(30, 41, 59, 0.4);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: var(--color-text-primary);
+}
+
+.theme-futuristic .btn-glass-primary {
+  background: linear-gradient(
+    135deg,
+    rgba(6, 182, 212, 0.2) 0%,
+    rgba(6, 182, 212, 0.1) 100%
+  );
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  color: #06b6d4;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(6, 182, 212, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.theme-futuristic .btn-glass-primary:hover:not(:disabled) {
+  background: linear-gradient(
+    135deg,
+    rgba(6, 182, 212, 0.3) 0%,
+    rgba(6, 182, 212, 0.2) 100%
+  );
+  border-color: rgba(6, 182, 212, 0.6);
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.4),
+    0 0 30px rgba(6, 182, 212, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  text-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+}
+
+.theme-futuristic .btn-glass-secondary {
+  background: linear-gradient(
+    135deg,
+    rgba(148, 163, 184, 0.2) 0%,
+    rgba(148, 163, 184, 0.1) 100%
+  );
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: var(--color-text-secondary);
+}
+
+.theme-futuristic .btn-glass-secondary:hover:not(:disabled) {
+  border-color: rgba(148, 163, 184, 0.5);
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(148, 163, 184, 0.2);
+}
+
+.theme-futuristic .btn-glass-destructive {
+  background: linear-gradient(
+    135deg,
+    rgba(239, 68, 68, 0.2) 0%,
+    rgba(239, 68, 68, 0.1) 100%
+  );
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(239, 68, 68, 0.2);
+}
+
+.theme-futuristic .btn-glass-destructive:hover:not(:disabled) {
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.4),
+    0 0 30px rgba(239, 68, 68, 0.4);
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
 }
 
 /* Fallback cho trình duyệt không hỗ trợ backdrop-filter */

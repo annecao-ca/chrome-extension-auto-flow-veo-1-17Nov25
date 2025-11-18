@@ -6,7 +6,7 @@
   <title>Auto Flow Veo</title>
   <link rel="stylesheet" href="popup.css">
 </head>
-<body>
+<body class="theme-futuristic">
   <div class="container">
     <!-- Header -->
     <div class="header">
@@ -66,14 +66,24 @@
           <label for="startIndex" data-i18n="startIndexLabel">Bắt đầu từ prompt số:</label>
           <input type="number" id="startIndex" min="1" value="1" class="setting-input">
         </div>
-        <div class="setting-item">
-          <label for="delayMin" data-i18n="delayMinLabel">Delay tối thiểu (giây):</label>
-          <input type="number" id="delayMin" min="30" value="90" class="setting-input">
-        </div>
-        <div class="setting-item">
-          <label for="delayMax" data-i18n="delayMaxLabel">Delay tối đa (giây):</label>
-          <input type="number" id="delayMax" min="60" value="120" class="setting-input">
-        </div>
+          <div class="setting-item">
+            <label for="delayMin" data-i18n="delayMinLabel">Delay tối thiểu (giây):</label>
+            <input type="number" id="delayMin" min="5" value="10" class="setting-input">
+          </div>
+          <div class="setting-item">
+            <label for="delayMax" data-i18n="delayMaxLabel">Delay tối đa (giây):</label>
+            <input type="number" id="delayMax" min="10" value="15" class="setting-input">
+          </div>
+          <div class="setting-item">
+            <label for="characterDescription" data-i18n="characterLabel">Mô tả nhân vật (để giữ consistency):</label>
+            <textarea id="characterDescription" rows="2" class="setting-input" placeholder="Ví dụ: A distinguished European man named Arthur, 70 years old, white hair, friendly face"></textarea>
+            <small style="color: var(--color-text-secondary); font-size: 0.85em;">Mô tả này sẽ được thêm vào mọi prompt để giữ nhân vật đồng nhất</small>
+          </div>
+          <div class="setting-item">
+            <label for="sceneDescription" data-i18n="sceneLabel">Mô tả cảnh (để giữ consistency):</label>
+            <textarea id="sceneDescription" rows="2" class="setting-input" placeholder="Ví dụ: Modern smart home environment, warm lighting, contemporary furniture"></textarea>
+            <small style="color: var(--color-text-secondary); font-size: 0.85em;">Mô tả này sẽ được thêm vào mọi prompt để giữ cảnh đồng nhất</small>
+          </div>
       </div>
     </div>
 

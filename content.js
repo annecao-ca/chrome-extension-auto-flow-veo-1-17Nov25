@@ -3,6 +3,8 @@
 let isProcessing = false;
 let currentPrompt = null;
 let currentType = null;
+let initialMediaCount = 0; // Track media count when starting a new prompt
+let initialMediaSrcs = new Set(); // Track media sources when starting
 
 // Debug helper: Log all potential input elements
 function debugFindInputs() {
@@ -127,6 +129,18 @@ async function handleProcessPrompt(message) {
   currentPrompt = message.prompt;
   currentType = message.type;
   
+  // ENHANCE PROMPT: Add character and scene description for consistency
+  const enhancedPrompt = enhancePromptForConsistency(
+    currentPrompt,
+    message.characterDescription || '',
+    message.sceneDescription || ''
+  );
+  
+  if (enhancedPrompt !== currentPrompt) {
+    logToPopup('info', 'Đã enhance prompt với character/scene description để giữ consistency');
+    currentPrompt = enhancedPrompt; // Use enhanced prompt
+  }
+  
   logToPopup('info', `Bắt đầu xử lý prompt ${message.promptIndex}/${message.totalPrompts}: "${currentPrompt.substring(0, 50)}..."`);
   
   try {
@@ -134,12 +148,40 @@ async function handleProcessPrompt(message) {
     await waitForPageReady();
     logToPopup('info', 'Trang đã sẵn sàng');
     
-    // Wait a bit more for React/Vue components to render (minimal wait)
-    await sleep(800);
+    // CRITICAL: Record initial media count and sources BEFORE processing
+    // This ensures we only count NEW media created for this prompt
+    const existingMedia = document.querySelectorAll('video, img[src*="flow"], img[src*="veo"], img[src*="google"], canvas, [class*="preview" i], [class*="result" i]');
+    initialMediaCount = 0;
+    initialMediaSrcs = new Set();
+    
+    for (const media of existingMedia) {
+      if (isElementVisible(media)) {
+        if (media.tagName === 'IMG' && media.naturalWidth > 200) {
+          initialMediaCount++;
+          const src = media.src || media.currentSrc || '';
+          if (src && src.length > 20) {
+            initialMediaSrcs.add(src);
+          }
+        } else if (media.tagName === 'VIDEO' && media.duration > 0.5) {
+          initialMediaCount++;
+          const src = media.src || media.currentSrc || '';
+          if (src && src.length > 20) {
+            initialMediaSrcs.add(src);
+          }
+        } else if (media.offsetWidth > 300 && media.offsetHeight > 300) {
+          initialMediaCount++;
+        }
+      }
+    }
+    
+    logToPopup('info', `Đã ghi nhận ${initialMediaCount} media hiện có trên trang (sẽ chỉ count media MỚI)`);
+    
+    // Wait a bit more for React/Vue components to render (optimized for speed)
+    await sleep(400);
     
     // Scroll to top to ensure we're at the right place
     window.scrollTo(0, 0);
-    await sleep(200);
+    await sleep(100);
     
     // Try to close any modals or overlays that might be blocking
     const closeButtons = document.querySelectorAll('button[aria-label*="close" i], button[aria-label*="đóng" i], [class*="close" i]');
@@ -147,7 +189,7 @@ async function handleProcessPrompt(message) {
       if (isElementVisible(closeBtn)) {
         try {
           closeBtn.click();
-          await sleep(500);
+          await sleep(250);
         } catch (e) {
           // Ignore
         }
@@ -158,7 +200,7 @@ async function handleProcessPrompt(message) {
     const inputField = document.querySelector('textarea, input[type="text"], [contenteditable="true"]');
     if (inputField) {
       inputField.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      await sleep(500);
+      await sleep(250);
       logToPopup('info', 'Đã scroll đến input area');
     }
     
@@ -193,32 +235,32 @@ async function handleProcessPrompt(message) {
         logToPopup('warning', 'Prompt có thể chưa được điền đúng, thử lại...');
         // Try to fill again
         await fillPromptInput(currentPrompt);
-        await sleep(1000);
+        await sleep(500);
       } else {
         logToPopup('info', `Đã verify prompt: "${currentValue.substring(0, 50)}..."`);
       }
     }
     
-    // Wait for website validation (minimal wait)
+    // Wait for website validation (optimized for speed)
     logToPopup('info', 'Đang chờ website validate prompt...');
-    await sleep(500);
+    await sleep(250);
     
     // Try Enter key to submit (sometimes works better than clicking button)
     if (inputElement) {
       inputElement.focus();
-      await sleep(200);
+      await sleep(100);
       logToPopup('info', 'Thử Enter key để submit...');
       inputElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
       inputElement.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
       inputElement.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
-      await sleep(500);
+      await sleep(250);
       
       // Check if Enter key triggered processing
       const hasProcessing = document.querySelector('[class*="loading" i], [class*="generating" i], [class*="processing" i], [aria-busy="true"]');
       if (hasProcessing) {
         logToPopup('success', 'Enter key đã trigger processing! Bỏ qua click button.');
         // Skip button click if Enter worked, but still verify processing started
-        await sleep(500);
+        await sleep(250);
         // Continue to verify processing section below
       } else {
         logToPopup('info', 'Enter key chưa trigger processing, sẽ thử click button...');
@@ -254,9 +296,9 @@ async function handleProcessPrompt(message) {
       logToPopup('info', 'Processing đã bắt đầu từ Enter key, bỏ qua click button');
     }
     
-    // Wait and verify that processing actually started (minimal wait)
+    // Wait and verify that processing actually started (optimized for speed)
     logToPopup('info', 'Đang verify website đã bắt đầu xử lý...');
-    await sleep(500);
+    await sleep(250);
     
     // Verify processing started - if not, retry (minimal retries)
     if (!inputElement) {
@@ -277,12 +319,12 @@ async function handleProcessPrompt(message) {
       
       if (verifyAttempt < 2) {
         logToPopup('warning', `Chưa thấy dấu hiệu xử lý, thử lại lần ${verifyAttempt + 2}...`);
-        await sleep(500);
+        await sleep(250);
         
         // Retry click button - find arrow button again
         if (inputElement) {
           inputElement.focus();
-          await sleep(200);
+          await sleep(100);
           
           // Find arrow button near input
           const container = inputElement.closest('[class*="input"], [class*="form"], [class*="prompt"], [class*="text"], [class*="create"]') || inputElement.parentElement;
@@ -294,7 +336,7 @@ async function handleProcessPrompt(message) {
                 if (hasArrow) {
                   btn.click();
                   logToPopup('info', 'Đã retry click arrow button');
-                  await sleep(200);
+                  await sleep(100);
                   break;
                 }
               }
@@ -309,8 +351,8 @@ async function handleProcessPrompt(message) {
       throw new Error('Website không bắt đầu xử lý sau khi click button');
     }
     
-    // Wait minimal time to see if there are any errors
-    await sleep(300);
+    // Wait minimal time to see if there are any errors (optimized)
+    await sleep(150);
     
     // Check for error messages more thoroughly
     const errorSelectors = [
@@ -518,10 +560,10 @@ async function fillPromptInput(prompt, retries = 5) {
       break;
     }
     
-    // Wait before retry
+    // Wait before retry (optimized for speed)
     if (attempt < retries - 1) {
-      logToPopup('info', `Chờ 2s trước khi thử lại...`);
-      await sleep(2000);
+      logToPopup('info', `Chờ 1s trước khi thử lại...`);
+      await sleep(1000);
     }
   }
   
@@ -541,7 +583,7 @@ async function fillPromptInput(prompt, retries = 5) {
   try {
     // Focus first
   input.focus();
-    await sleep(200);
+    await sleep(100);
     
     // Select all and delete (to clear existing content)
     if (document.activeElement === input) {
@@ -549,12 +591,12 @@ async function fillPromptInput(prompt, retries = 5) {
       if (input.setSelectionRange) {
         input.setSelectionRange(0, input.value ? input.value.length : 0);
       }
-      await sleep(100);
+      await sleep(50);
       
       // Simulate key events to clear
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
       input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Backspace', bubbles: true }));
-      await sleep(100);
+      await sleep(50);
     }
     
     // For contenteditable divs
@@ -602,14 +644,14 @@ async function fillPromptInput(prompt, retries = 5) {
       input.focus(); // Focus again
     }
   
-  // Wait a bit for any validation
-    await sleep(1000);
+  // Wait a bit for any validation (optimized for speed)
+    await sleep(500);
     
     // Verify the value was set
     const currentValue = input.value || input.textContent || input.innerText || '';
     if (!currentValue.includes(prompt.substring(0, Math.min(10, prompt.length)))) {
       logToPopup('warning', 'Có thể prompt chưa được điền đúng, thử lại...');
-  await sleep(500);
+  await sleep(250);
   
       // Try direct assignment
       if (input.contentEditable === 'true' || input.hasAttribute('contenteditable')) {
@@ -624,7 +666,7 @@ async function fillPromptInput(prompt, retries = 5) {
       input.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
       input.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true }));
       
-      await sleep(500);
+      await sleep(250);
     }
     
     logToPopup('info', `Đã điền prompt (${prompt.length} ký tự)`);
@@ -651,7 +693,7 @@ async function clickCreateButton(type, retries = 5) {
   if (inputField) {
     // Scroll input into view
     inputField.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    await sleep(300);
+    await sleep(150);
     
     // Find parent container of input - try multiple levels
     let container = inputField.closest('[class*="input"], [class*="form"], [class*="prompt"], [class*="text"], [class*="create"], [class*="card"], [class*="panel"]');
@@ -997,9 +1039,9 @@ async function clickCreateButton(type, retries = 5) {
       break;
     }
     
-    // Wait before retry
+    // Wait before retry (optimized for speed)
     if (attempt < retries - 1) {
-      await sleep(2000);
+      await sleep(1000);
     }
   }
   
@@ -1106,12 +1148,12 @@ async function clickCreateButton(type, retries = 5) {
   
   // Scroll into view (instant, no smooth)
   button.scrollIntoView({ behavior: 'auto', block: 'center' });
-  await sleep(100);
+  await sleep(50);
   
   // Make sure button is still visible and enabled
   if (!isElementVisible(button)) {
     button.scrollIntoView({ behavior: 'auto', block: 'center' });
-    await sleep(100);
+    await sleep(50);
   }
   
   // Try multiple click methods for React/Vue compatibility (optimized - do all quickly)
@@ -1144,10 +1186,10 @@ async function clickCreateButton(type, retries = 5) {
     // Ignore
   }
   
-  await sleep(200); // Minimal wait for request to be sent
+  await sleep(100); // Minimal wait for request to be sent (optimized)
   
-  // Verify that click actually triggered something (minimal wait)
-  await sleep(500);
+  // Verify that click actually triggered something (optimized)
+  await sleep(250);
   
   // Check if there are any changes indicating the request was sent
   let hasProcessingIndicator = document.querySelector('[class*="loading" i], [class*="generating" i], [class*="processing" i], [aria-busy="true"]');
@@ -1174,11 +1216,11 @@ async function clickCreateButton(type, retries = 5) {
       // Try Enter key first (sometimes works better than click)
       if (inputField) {
         inputField.focus();
-        await sleep(100);
+        await sleep(50);
         inputField.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
         inputField.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
         inputField.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
-        await sleep(200);
+        await sleep(100);
       }
       
       // Click button again with all methods
@@ -1196,7 +1238,7 @@ async function clickCreateButton(type, retries = 5) {
         }
       }
       
-      await sleep(500); // Wait longer for processing to start
+      await sleep(250); // Wait for processing to start (optimized)
       
       // Check again
       hasProcessingIndicator = document.querySelector('[class*="loading" i], [class*="generating" i], [class*="processing" i], [aria-busy="true"]');
@@ -1268,77 +1310,96 @@ async function monitorCompletion() {
     }
     
     // Fast path: Check for video/image elements that might indicate completion
+    // CRITICAL: Only count NEW media (not existing media from previous prompts)
     if (!completed) {
       const mediaElements = document.querySelectorAll('video, img, canvas, [class*="preview" i], [class*="result" i], [class*="output" i]');
       let currentMediaCount = 0;
+      let newMediaCount = 0; // Count only NEW media
       let hasLoadedMedia = false;
       const currentMediaSrcs = new Set();
+      const newMediaSrcs = new Set(); // Track NEW media sources
       
         for (const el of mediaElements) {
         if (isElementVisible(el)) {
-          currentMediaCount++;
-          
           // Track media sources
           let src = '';
+          let isNewMedia = false;
+          
           if (el.tagName === 'VIDEO' || el.tagName === 'IMG') {
             src = el.src || el.currentSrc || '';
             if (src && (src.includes('flow') || src.includes('veo') || src.includes('google') || src.startsWith('http'))) {
               currentMediaSrcs.add(src);
+              // Check if this is NEW media (not in initial set)
+              if (!initialMediaSrcs.has(src) && src.length > 20) {
+                isNewMedia = true;
+                newMediaSrcs.add(src);
+              }
             }
           }
           
-          if (el.tagName === 'VIDEO') {
-            if (el.readyState >= 2 && el.duration > 0 && el.duration > 0.1) {
-            completed = true;
-              hasLoadedMedia = true;
-              logToPopup('success', `Tìm thấy video đã load (duration: ${el.duration.toFixed(1)}s)`);
-            break;
+          // Count all visible media
+          if (el.tagName === 'VIDEO' || el.tagName === 'IMG' || el.tagName === 'CANVAS' || 
+              (el.classList && Array.from(el.classList).some(c => c.toLowerCase().includes('preview') || c.toLowerCase().includes('result')))) {
+            currentMediaCount++;
           }
-          } else if (el.tagName === 'IMG') {
-            if (el.complete && el.naturalWidth > 0 && el.naturalHeight > 0) {
-              // Check if it's a real image (not just an icon) - require larger size
-              if (el.naturalWidth > 200 && el.naturalHeight > 200 && isElementVisible(el)) {
+          
+          // Only consider completion if we find NEW media
+          if (isNewMedia) {
+            newMediaCount++;
+            
+            if (el.tagName === 'VIDEO') {
+              if (el.readyState >= 2 && el.duration > 0 && el.duration > 0.1) {
                 completed = true;
                 hasLoadedMedia = true;
-                logToPopup('success', `Tìm thấy image đã load (${el.naturalWidth}x${el.naturalHeight})`);
+                logToPopup('success', `Tìm thấy VIDEO MỚI đã load (duration: ${el.duration.toFixed(1)}s)`);
                 break;
               }
-            }
-          } else if (el.tagName === 'CANVAS') {
-            if (el.width > 0 && el.height > 0) {
-              // Check if canvas has actual content (not just empty)
-              try {
-                const ctx = el.getContext('2d');
-                const imageData = ctx.getImageData(0, 0, Math.min(10, el.width), Math.min(10, el.height));
-                const hasContent = imageData.data.some((val, idx) => idx % 4 !== 3 && val !== 0);
-                if (hasContent && el.width > 100 && el.height > 100) {
+            } else if (el.tagName === 'IMG') {
+              if (el.complete && el.naturalWidth > 0 && el.naturalHeight > 0) {
+                // Check if it's a real image (not just an icon) - require larger size
+                if (el.naturalWidth > 200 && el.naturalHeight > 200 && isElementVisible(el)) {
                   completed = true;
                   hasLoadedMedia = true;
-                  logToPopup('success', `Tìm thấy canvas với content (${el.width}x${el.height})`);
-                  break;
-                }
-              } catch (e) {
-                // Canvas might be from different origin, just check size
-                if (el.width > 200 && el.height > 200) {
-                  completed = true;
-                  hasLoadedMedia = true;
-                  logToPopup('success', `Tìm thấy canvas lớn (${el.width}x${el.height})`);
+                  logToPopup('success', `Tìm thấy IMAGE MỚI đã load (${el.naturalWidth}x${el.naturalHeight})`);
                   break;
                 }
               }
-            }
-          } else if (el.classList) {
-            const classes = Array.from(el.classList).map(c => c.toLowerCase());
-            // Preview, result, output elements - require larger size and visibility
-            if (classes.some(c => c.includes('preview') || c.includes('result') || c.includes('output') || c.includes('generated'))) {
-              if (el.offsetWidth > 300 && el.offsetHeight > 300 && isElementVisible(el)) {
-                // Also check if it contains actual media (img or video)
-                const hasMediaInside = el.querySelector('img[src], video[src]');
-                if (hasMediaInside) {
-                  completed = true;
-                  hasLoadedMedia = true;
-                  logToPopup('success', `Tìm thấy preview/result element với media (${el.offsetWidth}x${el.offsetHeight})`);
-                  break;
+            } else if (el.tagName === 'CANVAS') {
+              if (el.width > 0 && el.height > 0) {
+                // Check if canvas has actual content (not just empty)
+                try {
+                  const ctx = el.getContext('2d');
+                  const imageData = ctx.getImageData(0, 0, Math.min(10, el.width), Math.min(10, el.height));
+                  const hasContent = imageData.data.some((val, idx) => idx % 4 !== 3 && val !== 0);
+                  if (hasContent && el.width > 100 && el.height > 100) {
+                    completed = true;
+                    hasLoadedMedia = true;
+                    logToPopup('success', `Tìm thấy canvas MỚI với content (${el.width}x${el.height})`);
+                    break;
+                  }
+                } catch (e) {
+                  // Canvas might be from different origin, just check size
+                  if (el.width > 200 && el.height > 200) {
+                    completed = true;
+                    hasLoadedMedia = true;
+                    logToPopup('success', `Tìm thấy canvas MỚI lớn (${el.width}x${el.height})`);
+                    break;
+                  }
+                }
+              }
+            } else if (el.classList) {
+              const classes = Array.from(el.classList).map(c => c.toLowerCase());
+              // Preview, result, output elements - require larger size and visibility
+              if (classes.some(c => c.includes('preview') || c.includes('result') || c.includes('output') || c.includes('generated'))) {
+                if (el.offsetWidth > 300 && el.offsetHeight > 300 && isElementVisible(el)) {
+                  // Also check if it contains actual media (img or video)
+                  const hasMediaInside = el.querySelector('img[src], video[src]');
+                  if (hasMediaInside) {
+                    completed = true;
+                    hasLoadedMedia = true;
+                    logToPopup('success', `Tìm thấy preview/result element MỚI với media (${el.offsetWidth}x${el.offsetHeight})`);
+                    break;
+                  }
                 }
               }
             }
@@ -1346,20 +1407,28 @@ async function monitorCompletion() {
         }
       }
       
-      // Track progress: if media count increased or new sources appeared, we have progress
-      if (currentMediaCount > lastMediaCount) {
+      // Log progress: show NEW media count
+      if (newMediaCount > 0) {
+        logToPopup('info', `Phát hiện ${newMediaCount} media MỚI (tổng: ${currentMediaCount}, ban đầu: ${initialMediaCount})`);
+      }
+      
+      // Track progress: Only count NEW media (not existing media)
+      // Compare current count to initial count to detect NEW media
+      const actualNewMediaCount = currentMediaCount - initialMediaCount;
+      
+      if (actualNewMediaCount > 0 && actualNewMediaCount > (lastMediaCount - initialMediaCount)) {
         lastMediaCount = currentMediaCount;
         noProgressTime = 0;
         hasSeenProcessing = true;
         hasStartedProcessing = true;
-        logToPopup('info', `Phát hiện ${currentMediaCount} media element(s)`);
+        logToPopup('info', `Phát hiện ${actualNewMediaCount} media MỚI (tổng: ${currentMediaCount}, ban đầu: ${initialMediaCount})`);
       }
       
-      // Check for new media sources (new images/videos appeared)
-      const newSources = Array.from(currentMediaSrcs).filter(src => !lastMediaSrcs.has(src));
-      if (newSources.length > 0) {
+      // Check for NEW media sources (sources that weren't there at start)
+      const trulyNewSources = Array.from(newMediaSrcs).filter(src => !lastMediaSrcs.has(src));
+      if (trulyNewSources.length > 0) {
         // Verify these are real media sources (not just icons or placeholders)
-        const realSources = newSources.filter(src => {
+        const realSources = trulyNewSources.filter(src => {
           // Check if source URL looks like actual media (not icon, not placeholder)
           return src.length > 20 && 
                  !src.includes('icon') && 
@@ -1369,11 +1438,12 @@ async function monitorCompletion() {
         });
         
         if (realSources.length > 0) {
-          lastMediaSrcs = currentMediaSrcs;
+          // Update lastMediaSrcs to include new sources
+          trulyNewSources.forEach(src => lastMediaSrcs.add(src));
           noProgressTime = 0;
           hasSeenProcessing = true;
           hasStartedProcessing = true;
-          logToPopup('info', `Phát hiện ${realSources.length} media source(s) mới (đã verify)`);
+          logToPopup('info', `Phát hiện ${realSources.length} media source MỚI (đã verify)`);
         }
       } else if (!hasLoadedMedia) {
         // Only increment noProgressTime if we haven't seen any processing yet
@@ -1417,11 +1487,14 @@ async function monitorCompletion() {
       }
       
       // Check for changes in DOM (new elements appearing = progress)
+      // Only count if NEW media appeared (not just existing media)
       const currentMediaCount = document.querySelectorAll('video, img[src*="flow"], img[src*="veo"], canvas, [class*="preview" i]').length;
-      if (currentMediaCount !== lastMediaCount) {
+      const actualNewCount = currentMediaCount - initialMediaCount;
+      if (actualNewCount > 0 && currentMediaCount !== lastMediaCount) {
         hasSeenProcessing = true;
         noProgressTime = 0;
         lastMediaCount = currentMediaCount;
+        logToPopup('info', `Phát hiện media mới: ${actualNewCount} (tổng: ${currentMediaCount}, ban đầu: ${initialMediaCount})`);
       }
       
       // Check for any text changes that might indicate progress
@@ -1471,26 +1544,41 @@ async function monitorCompletion() {
       // CRITICAL: Verify media is actually visible on page before reporting completion
       logToPopup('info', 'Đã phát hiện completion indicator, đang verify media thực sự...');
       
-      // Scroll through page to find actual visible media
+      // Scroll through page to find actual visible NEW media
       const originalScrollY = window.scrollY;
       let verifiedMedia = null;
       
-      // Check current viewport
+      // Check current viewport - ONLY look for NEW media
       let mediaElements = document.querySelectorAll('video, img, canvas, [class*="preview" i], [class*="result" i], [class*="output" i]');
       for (const media of mediaElements) {
         if (isElementVisible(media)) {
-          if (media.tagName === 'IMG' && media.naturalWidth > 200 && media.naturalHeight > 200) {
-            verifiedMedia = media;
-            logToPopup('success', `Tìm thấy image thực sự (${media.naturalWidth}x${media.naturalHeight})`);
-            break;
-          } else if (media.tagName === 'VIDEO' && media.duration > 0.5 && media.readyState >= 2) {
-            verifiedMedia = media;
-            logToPopup('success', `Tìm thấy video thực sự (duration: ${media.duration.toFixed(1)}s)`);
-            break;
-          } else if (media.offsetWidth > 300 && media.offsetHeight > 300) {
-            verifiedMedia = media;
-            logToPopup('success', `Tìm thấy media element lớn (${media.offsetWidth}x${media.offsetHeight})`);
-            break;
+          // CRITICAL: Verify this is NEW media (not existing)
+          let isNew = false;
+          if (media.tagName === 'VIDEO' || media.tagName === 'IMG') {
+            const src = media.src || media.currentSrc || '';
+            if (src && src.length > 20 && !initialMediaSrcs.has(src)) {
+              isNew = true;
+            }
+          } else {
+            // For canvas/elements, check if they're newly created
+            // Assume it's new if it wasn't in initial count
+            isNew = true; // Will verify by size/visibility
+          }
+          
+          if (isNew || !initialMediaSrcs.size) { // If no initial media, accept any
+            if (media.tagName === 'IMG' && media.naturalWidth > 200 && media.naturalHeight > 200) {
+              verifiedMedia = media;
+              logToPopup('success', `Tìm thấy IMAGE MỚI thực sự (${media.naturalWidth}x${media.naturalHeight})`);
+              break;
+            } else if (media.tagName === 'VIDEO' && media.duration > 0.5 && media.readyState >= 2) {
+              verifiedMedia = media;
+              logToPopup('success', `Tìm thấy VIDEO MỚI thực sự (duration: ${media.duration.toFixed(1)}s)`);
+              break;
+            } else if (media.offsetWidth > 300 && media.offsetHeight > 300) {
+              verifiedMedia = media;
+              logToPopup('success', `Tìm thấy media element MỚI lớn (${media.offsetWidth}x${media.offsetHeight})`);
+              break;
+            }
           }
         }
       }
@@ -1684,17 +1772,98 @@ async function monitorCompletion() {
 async function triggerDownload() {
   logToPopup('info', 'Đang tìm cách tải về...');
   
-  // Strategy 1: Try to find and click download button
+  // Strategy 0: First, try to find download button near the most recent video/image
+  // This is often the most reliable method
+  // Filter out banner videos
+  const allRecentMedia = Array.from(document.querySelectorAll('video, img[src*="flow"], img[src*="veo"], img[src*="google"]'));
+  const recentMedia = allRecentMedia.filter(media => {
+    const src = media.src || media.currentSrc || media.getAttribute('src') || '';
+    return !src.toLowerCase().includes('banner') && 
+           !src.toLowerCase().includes('background') &&
+           !src.toLowerCase().includes('flow31_bg');
+  });
+  
+  if (recentMedia.length > 0) {
+    // Get the last (most recent) media element
+    const lastMedia = recentMedia[recentMedia.length - 1];
+    if (isElementVisible(lastMedia)) {
+      logToPopup('info', 'Tìm download button gần media element mới nhất...');
+      
+      // Look for download button in parent containers (wider search)
+      let container = lastMedia.parentElement;
+      for (let i = 0; i < 8 && container; i++) {
+        // Try multiple selectors
+        const downloadBtn = container.querySelector(
+          'button[aria-label*="download" i], ' +
+          'button[aria-label*="tải" i], ' +
+          'button[aria-label*="save" i], ' +
+          'button[aria-label*="lưu" i], ' +
+          'a[download], ' +
+          'button[data-testid*="download" i], ' +
+          '[class*="download" i][role="button"], ' +
+          '[class*="save" i][role="button"], ' +
+          'button[title*="download" i], ' +
+          'button[title*="tải" i], ' +
+          '[aria-label*="download" i][role="button"]'
+        );
+        
+        if (downloadBtn && isElementVisible(downloadBtn)) {
+          logToPopup('success', 'Tìm thấy download button gần media!');
+          downloadBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          await sleep(500);
+          downloadBtn.click();
+          logToPopup('success', 'Đã click download button');
+          await sleep(2000);
+          return;
+        }
+        container = container.parentElement;
+      }
+      
+      // Also try to find download button by looking for icons (SVG)
+      container = lastMedia.parentElement;
+      for (let i = 0; i < 8 && container; i++) {
+        const buttons = container.querySelectorAll('button, a, [role="button"]');
+        for (const btn of buttons) {
+          if (isElementVisible(btn)) {
+            // Check if button has download icon
+            const hasDownloadIcon = btn.querySelector('svg[class*="download" i], svg[class*="arrow_down" i], svg[class*="save" i]');
+            const text = (btn.textContent || btn.getAttribute('aria-label') || '').toLowerCase();
+            if (hasDownloadIcon || text.includes('download') || text.includes('tải')) {
+              logToPopup('success', 'Tìm thấy download button (có icon)!');
+              btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              await sleep(500);
+              btn.click();
+              logToPopup('success', 'Đã click download button');
+              await sleep(2000);
+              return;
+            }
+          }
+        }
+        container = container.parentElement;
+      }
+    }
+  }
+  
+  // Strategy 1: Try to find and click download button (general search)
+  // Expanded selectors to catch more variations
   const downloadSelectors = [
     'button[aria-label*="download" i]',
     'button[aria-label*="tải" i]',
     'button[aria-label*="save" i]',
     'button[aria-label*="lưu" i]',
+    'button[aria-label*="export" i]',
+    'button[aria-label*="xuất" i]',
     'a[download]',
     'a[href*="download" i]',
     'button[data-testid*="download" i]',
-    '[class*="download" i]',
-    '[class*="save" i]'
+    '[class*="download" i][role="button"]',
+    '[class*="save" i][role="button"]',
+    'button[title*="download" i]',
+    'button[title*="tải" i]',
+    '[aria-label*="download" i][role="button"]',
+    // Also try buttons with download icons
+    'button:has(svg[class*="download" i])',
+    'button:has(svg[class*="arrow_down" i])'
   ];
   
   for (const selector of downloadSelectors) {
@@ -1715,33 +1884,209 @@ async function triggerDownload() {
     }
   }
   
-  // Strategy 2: Right-click on media element to download
-  const mediaElements = document.querySelectorAll('video, img, canvas, [class*="preview" i], [class*="result" i], [class*="output" i]');
+  // Strategy 2: Use Chrome Downloads API directly (NEW - Most reliable)
+  // Find the most recent media element (newly created)
+  // IMPORTANT: Filter out banner/background videos
+  const allMediaElements = Array.from(document.querySelectorAll('video, img[src*="flow"], img[src*="veo"], img[src*="google"], canvas, [class*="preview" i], [class*="result" i], [class*="output" i]'));
+  
+  // Filter out banner/background videos and images
+  const mediaElements = allMediaElements.filter(media => {
+    const src = media.src || media.currentSrc || media.getAttribute('src') || '';
+    const srcLower = src.toLowerCase();
+    
+    // Skip banner/background media
+    if (srcLower.includes('banner') || 
+        srcLower.includes('background') || 
+        srcLower.includes('flow31_bg') ||
+        srcLower.includes('header') ||
+        srcLower.includes('nav')) {
+      return false;
+    }
+    
+    // For video, check if it's in a project container (not banner)
+    if (media.tagName === 'VIDEO') {
+      // Check if video is in a project-related container
+      let parent = media.parentElement;
+      let isInProject = false;
+      for (let i = 0; i < 10 && parent; i++) {
+        const className = parent.className || '';
+        const id = parent.id || '';
+        if (className.toLowerCase().includes('project') ||
+            className.toLowerCase().includes('result') ||
+            className.toLowerCase().includes('output') ||
+            className.toLowerCase().includes('media') ||
+            className.toLowerCase().includes('video') ||
+            id.toLowerCase().includes('project') ||
+            id.toLowerCase().includes('result')) {
+          isInProject = true;
+          break;
+        }
+        parent = parent.parentElement;
+      }
+      
+      // If video is very small (likely banner), skip it
+      if (media.offsetWidth < 500 && media.offsetHeight < 300) {
+        return false;
+      }
+      
+      return isInProject || media.offsetWidth > 500; // Only large videos or videos in project containers
+    }
+    
+    return true;
+  });
+  
+  // Sort by position in DOM (newer elements are usually later)
+  mediaElements.sort((a, b) => {
+    const aPos = Array.from(document.querySelectorAll('*')).indexOf(a);
+    const bPos = Array.from(document.querySelectorAll('*')).indexOf(b);
+    return bPos - aPos; // Newer elements first
+  });
+  
+  logToPopup('info', `Tìm thấy ${mediaElements.length} media elements (sau khi filter banner)`);
+  
   for (const media of mediaElements) {
     if (isElementVisible(media)) {
       // Check if it's a real media (not icon)
       const isRealMedia = (media.tagName === 'IMG' && media.naturalWidth > 200) ||
-                         (media.tagName === 'VIDEO' && media.duration > 0.5) ||
+                         (media.tagName === 'VIDEO' && (media.duration > 0.5 || media.readyState >= 2)) ||
                          (media.offsetWidth > 300 && media.offsetHeight > 300);
       
       if (isRealMedia) {
         try {
-          // Try to get download URL from media element
-          if (media.tagName === 'VIDEO' || media.tagName === 'IMG') {
-            const src = media.src || media.currentSrc || media.getAttribute('src');
-            if (src && src.startsWith('http')) {
-              // Try to trigger download via direct link
-              const link = document.createElement('a');
-              link.href = src;
-              link.download = `flow_${currentType}_${Date.now()}.${currentType === 'video' ? 'mp4' : 'png'}`;
-              link.style.display = 'none';
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              logToPopup('success', 'Đã trigger download từ media element');
+          // Try to get download URL from media element (multiple sources)
+          let downloadUrl = null;
+          let downloadType = currentType;
+          
+          if (media.tagName === 'VIDEO') {
+            // For video, try multiple sources
+            downloadUrl = media.src || 
+                         media.currentSrc || 
+                         media.getAttribute('src') ||
+                         (media.querySelector('source') && media.querySelector('source').src);
+            
+            // If still no URL, try to get from video element's data
+            if (!downloadUrl || downloadUrl === '') {
+              // Try to get blob URL
+              if (media.src && media.src.startsWith('blob:')) {
+                downloadUrl = media.src;
+                logToPopup('info', 'Tìm thấy blob URL, đang xử lý...');
+              }
+            }
+            
+            // If video has source element, try that
+            if (!downloadUrl || downloadUrl === '') {
+              const sourceElement = media.querySelector('source');
+              if (sourceElement) {
+                downloadUrl = sourceElement.src || sourceElement.getAttribute('src');
+              }
+            }
+            
+            downloadType = 'video';
+          } else if (media.tagName === 'IMG') {
+            downloadUrl = media.src || 
+                         media.currentSrc || 
+                         media.getAttribute('src') ||
+                         media.getAttribute('data-src');
+            downloadType = 'image';
+          }
+          
+          // Log what we found
+          logToPopup('info', `Tìm thấy ${downloadType}: ${downloadUrl ? downloadUrl.substring(0, 50) : 'no URL'}...`);
+          
+          if (downloadUrl) {
+            // Handle blob URLs - need to convert to downloadable format
+            if (downloadUrl.startsWith('blob:')) {
+              logToPopup('info', 'Phát hiện blob URL, đang tìm cách download...');
+              // Blob URLs can't be downloaded directly via Chrome API
+              // Try to find download button on the page instead
+              // Or try to fetch and convert blob
+              try {
+                // First, try to find download button near this video element
+                let downloadBtn = null;
+                let parent = media.parentElement;
+                for (let i = 0; i < 5 && parent; i++) {
+                  const btn = parent.querySelector('button[aria-label*="download" i], button[aria-label*="tải" i], a[download]');
+                  if (btn && isElementVisible(btn)) {
+                    downloadBtn = btn;
+                    break;
+                  }
+                  parent = parent.parentElement;
+                }
+                
+                if (downloadBtn) {
+                  logToPopup('info', 'Tìm thấy download button, đang click...');
+                  downloadBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  await sleep(500);
+                  downloadBtn.click();
+                  logToPopup('success', 'Đã click download button');
+                  await sleep(2000);
+                  return;
+                }
+                
+                // If no button, try to fetch blob and create download link
+                logToPopup('info', 'Không tìm thấy button, thử fetch blob...');
+                const response = await fetch(downloadUrl);
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                
+                // Create temporary download link
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = `flow_${downloadType}_${Date.now()}.${downloadType === 'video' ? 'mp4' : 'png'}`;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(blobUrl);
+                
+                logToPopup('success', 'Đã tạo download link từ blob');
+                await sleep(2000);
+                return;
+              } catch (blobError) {
+                logToPopup('warning', `Blob error: ${blobError.message}, thử tìm download button...`);
+                // Continue to try other methods below
+              }
+            }
+            
+            // For HTTP/HTTPS URLs, use Chrome Downloads API
+            if (downloadUrl.startsWith('http')) {
+              logToPopup('info', 'Đang tải về qua Chrome Downloads API...');
+              try {
+                chrome.runtime.sendMessage({
+                  action: 'downloadMedia',
+                  url: downloadUrl,
+                  filename: `flow_${downloadType}_${Date.now()}.${downloadType === 'video' ? 'mp4' : 'png'}`,
+                  promptIndex: currentPrompt ? currentPrompt.substring(0, 30) : 'unknown'
+                }, (response) => {
+                  if (chrome.runtime.lastError) {
+                    logToPopup('warning', `Chrome API error: ${chrome.runtime.lastError.message}, thử cách khác...`);
+                    // Fallback to direct link download
+                    fallbackDirectDownload(downloadUrl, downloadType);
+                  } else if (response && response.success) {
+                    logToPopup('success', `Đã bắt đầu download ${downloadType} qua Chrome API`);
+                  } else {
+                    logToPopup('warning', 'Không nhận được response, thử cách khác...');
+                    fallbackDirectDownload(downloadUrl, downloadType);
+                  }
+                });
+                await sleep(1500);
+                return; // Exit after trying Chrome API
+              } catch (apiError) {
+                logToPopup('warning', `API error: ${apiError.message}, thử cách khác...`);
+                // Fallback to direct link download
+                fallbackDirectDownload(downloadUrl, downloadType);
+                await sleep(2000);
+                return;
+              }
+            } else {
+              // For other URLs (data:, etc.), try direct download
+              logToPopup('info', 'URL không phải HTTP, thử direct download...');
+              fallbackDirectDownload(downloadUrl, downloadType);
               await sleep(2000);
               return;
             }
+          } else {
+            logToPopup('warning', `Không tìm thấy URL từ ${media.tagName} element`);
           }
           
           // Try right-click context menu (if browser allows)
@@ -1856,6 +2201,22 @@ async function triggerDownload() {
   logToPopup('info', 'Media đã được tạo, bạn có thể tải thủ công từ website');
 }
 
+// Helper function for fallback direct download
+function fallbackDirectDownload(src, type) {
+  try {
+    const link = document.createElement('a');
+    link.href = src;
+    link.download = `flow_${type}_${Date.now()}.${type === 'video' ? 'mp4' : 'png'}`;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    logToPopup('info', 'Đã trigger download fallback (direct link)');
+  } catch (e) {
+    logToPopup('error', `Fallback download failed: ${e.message}`);
+  }
+}
+
 function isElementVisible(element) {
   if (!element) return false;
   
@@ -1881,4 +2242,47 @@ function logToPopup(type, message) {
   }).catch(() => {
     // Ignore errors
   });
+}
+
+// Enhance prompt with character and scene description for consistency
+function enhancePromptForConsistency(originalPrompt, characterDescription, sceneDescription) {
+  // If no character/scene description, return original
+  if (!characterDescription && !sceneDescription) {
+    return originalPrompt;
+  }
+  
+  // Build enhanced prompt
+  let enhancedParts = [];
+  
+  // Add character description first (if provided)
+  if (characterDescription && characterDescription.trim()) {
+    enhancedParts.push(characterDescription.trim());
+  }
+  
+  // Add scene description (if provided)
+  if (sceneDescription && sceneDescription.trim()) {
+    enhancedParts.push(sceneDescription.trim());
+  }
+  
+  // Add original prompt
+  enhancedParts.push(originalPrompt.trim());
+  
+  // Add consistency instruction
+  if (characterDescription || sceneDescription) {
+    enhancedParts.push('Maintain consistent character appearance and scene continuity throughout.');
+  }
+  
+  const enhanced = enhancedParts.join('. ');
+  
+  // Log enhancement (only if changed)
+  if (enhanced !== originalPrompt) {
+    console.log('[Prompt Enhancement]', {
+      original: originalPrompt.substring(0, 100),
+      enhanced: enhanced.substring(0, 100),
+      hasCharacter: !!characterDescription,
+      hasScene: !!sceneDescription
+    });
+  }
+  
+  return enhanced;
 }

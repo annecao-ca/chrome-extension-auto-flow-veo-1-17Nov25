@@ -11,10 +11,20 @@ let workflowState = {
   totalTasks: 0,
   completedTasks: 0,
   successfulTasks: 0, // Track tasks that actually created media
-  queue: []
+  queue: [],
+  downloads: {} // Track active downloads
 };
 
-// Message handler
+// Keep service worker alive by listening to events
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('Background service worker installed/updated');
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  console.log('Background service worker started');
+});
+
+// Message handler - Must be synchronous for immediate response
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'start') {
     handleStart(message);
@@ -49,6 +59,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         currentIndex: workflowState.currentIndex
       }
     });
+  } else if (message.action === 'downloadMedia') {
+    handleDownloadMedia(message.url, message.filename, message.promptIndex);
+    sendResponse({ success: true });
   }
   
   return true; // Keep channel open for async response
@@ -73,6 +86,15 @@ function handleStart(message) {
   // Build queue
   buildQueue();
   
+  // Update persistent UI - show badge
+  updatePersistentUI('status', { 
+    type: 'info', 
+    message: `Bắt đầu xử lý ${workflowState.totalTasks} tasks` 
+  });
+  
+  // Send notification
+  sendNotification('info', `Bắt đầu xử lý ${workflowState.totalTasks} ${workflowState.type === 'video' ? 'video' : 'ảnh'}`);
+  
   // Start processing
   processNext();
 }
@@ -95,12 +117,25 @@ function buildQueue() {
 
 function handlePause() {
   workflowState.isPaused = true;
+  
+  // Update badge to show paused
+  chrome.action.setBadgeText({ text: '⏸' });
+  chrome.action.setBadgeBackgroundColor({ color: '#f59e0b' });
+  
   notifyPopup('log', { type: 'warning', message: 'Đã tạm dừng' });
+  sendNotification('warning', 'Đã tạm dừng');
 }
 
 function handleResume() {
   workflowState.isPaused = false;
+  
+  // Update badge to show running
+  const remaining = workflowState.totalTasks - workflowState.completedTasks;
+  chrome.action.setBadgeText({ text: remaining > 0 ? remaining.toString() : '' });
+  chrome.action.setBadgeBackgroundColor({ color: '#06b6d4' });
+  
   notifyPopup('log', { type: 'info', message: 'Đã tiếp tục' });
+  sendNotification('info', 'Đã tiếp tục xử lý');
   processNext();
 }
 
@@ -108,7 +143,12 @@ function handleStop() {
   workflowState.isRunning = false;
   workflowState.isPaused = false;
   workflowState.queue = [];
+  
+  // Clear badge
+  chrome.action.setBadgeText({ text: '' });
+  
   notifyPopup('log', { type: 'warning', message: 'Đã dừng' });
+  sendNotification('warning', 'Đã dừng xử lý');
 }
 
 function handlePromptCompleted(mediaFound = false) {
@@ -118,13 +158,25 @@ function handlePromptCompleted(mediaFound = false) {
   }
   notifyPopup('updateProgress', { completed: workflowState.completedTasks });
   
+  // Update persistent UI
+  updatePersistentUI('updateProgress', { completed: workflowState.completedTasks });
+  
   // Check if all tasks are completed
   if (workflowState.completedTasks >= workflowState.totalTasks) {
     workflowState.isRunning = false;
+    
+    // Update badge to show completed
+    chrome.action.setBadgeText({ text: '✓' });
+    chrome.action.setBadgeBackgroundColor({ color: '#10b981' }); // Green
+    
     if (workflowState.successfulTasks > 0) {
-      notifyPopup('log', { type: 'success', message: `✓ Hoàn thành tất cả! (${workflowState.successfulTasks}/${workflowState.totalTasks} có media)` });
+      const message = `✓ Hoàn thành tất cả! (${workflowState.successfulTasks}/${workflowState.totalTasks} có media)`;
+      notifyPopup('log', { type: 'success', message: message });
+      sendNotification('success', message);
     } else {
-      notifyPopup('log', { type: 'error', message: '⚠ Hoàn thành nhưng không có media nào được tạo!' });
+      const message = '⚠ Hoàn thành nhưng không có media nào được tạo!';
+      notifyPopup('log', { type: 'error', message: message });
+      sendNotification('error', message);
     }
     notifyPopup('status', { type: workflowState.successfulTasks > 0 ? 'success' : 'error', message: `Đã hoàn thành: ${workflowState.successfulTasks}/${workflowState.totalTasks} có media` });
   } else {
@@ -140,8 +192,14 @@ async function processNext() {
   if (workflowState.queue.length === 0) {
     // All done
     workflowState.isRunning = false;
+    
+    // Update badge to show completed
+    chrome.action.setBadgeText({ text: '✓' });
+    chrome.action.setBadgeBackgroundColor({ color: '#10b981' });
+    
     notifyPopup('log', { type: 'success', message: 'Hoàn thành tất cả!' });
     notifyPopup('status', { type: 'success', message: 'Đã hoàn thành tất cả prompts' });
+    sendNotification('success', 'Hoàn thành tất cả prompts!');
     return;
   }
   
@@ -156,15 +214,15 @@ async function processNext() {
     // Stage 1: Send immediately
     delay = 0;
   } else if (isEarlyStage) {
-    // Stage 2: Random delay 90-120s
-    const min = workflowState.settings.delayMin || 90;
-    const max = workflowState.settings.delayMax || 120;
+    // Stage 2: Random delay 10-15s (ultra-fast mode)
+    const min = workflowState.settings.delayMin || 10;
+    const max = workflowState.settings.delayMax || 15;
     delay = getRandomDelay(min, max);
   } else {
-    // Stage 3: Monitor queue + random delay
+    // Stage 3: Monitor queue + random delay (ultra-fast mode)
     // Check if there are items in queue on the website
-    const min = workflowState.settings.delayMin || 90;
-    const max = workflowState.settings.delayMax || 120;
+    const min = workflowState.settings.delayMin || 10;
+    const max = workflowState.settings.delayMax || 15;
     delay = getRandomDelay(min, max);
   }
   
@@ -225,18 +283,13 @@ async function processNext() {
       }
     }
     
-    // If found a tab but it's not active, activate it
+    // NOTE: KHÔNG tự động activate tab - để user có thể làm việc ở tab khác
+    // Extension sẽ tiếp tục chạy trong background, không cần tab phải active
     if (tab && !tab.active) {
-      try {
-        await chrome.tabs.update(tab.id, { active: true });
-        if (tab.windowId) {
-          await chrome.windows.update(tab.windowId, { focused: true });
-        }
-        logToPopup('info', 'Đã chuyển sang tab Google Flow/Veo3');
-        await sleep(1500); // Wait for tab to activate and load
-      } catch (e) {
-        logToPopup('warning', `Không thể chuyển sang tab: ${e.message}`);
-      }
+      logToPopup('info', `Tab Google Flow/Veo3 đang ở background (không active) - Extension vẫn tiếp tục chạy`);
+      // Không activate tab - để user có thể làm việc ở tab khác
+      // Chỉ cần đợi một chút để đảm bảo tab đã load (nếu cần)
+      await sleep(200); // Minimal wait - không cần activate
     }
   }
   
@@ -291,8 +344,8 @@ async function processNext() {
       });
       logToPopup('success', 'Đã inject content script');
       
-      // Wait minimal time for script to initialize
-      await sleep(300);
+      // Wait minimal time for script to initialize (optimized for speed)
+      await sleep(150);
       
       // Verify content script is ready by pinging (minimal retries)
       let verified = false;
@@ -308,7 +361,7 @@ async function processNext() {
         } catch (e) {
           if (attempt < 2) {
             logToPopup('info', `Đang chờ content script... (lần ${attempt + 1}/3)`);
-            await sleep(200); // Minimal wait between retries
+            await sleep(100); // Minimal wait between retries (optimized)
           }
         }
       }
@@ -353,14 +406,16 @@ async function processNext() {
     return;
   }
   
-  // Send message to content script
+  // Send message to content script with enhanced settings
   try {
     await chrome.tabs.sendMessage(tab.id, {
       action: 'processPrompt',
       prompt: task.prompt,
       type: workflowState.type,
       promptIndex: promptIndex + 1,
-      totalPrompts: workflowState.prompts.length
+      totalPrompts: workflowState.prompts.length,
+      characterDescription: workflowState.settings?.characterDescription || '',
+      sceneDescription: workflowState.settings?.sceneDescription || ''
     });
     logToPopup('success', 'Đã gửi prompt đến content script');
   } catch (error) {
@@ -388,11 +443,119 @@ function sleep(ms) {
 }
 
 function notifyPopup(action, data) {
-  chrome.runtime.sendMessage({
-    action: action,
-    ...data
-  }).catch(() => {
-    // Popup might be closed, ignore error
+  // Try to notify popup (if open)
+  try {
+    chrome.runtime.sendMessage({
+      action: action,
+      ...data
+    }, (response) => {
+      // Check for errors (popup might be closed)
+      if (chrome.runtime.lastError) {
+        // Popup is closed or not available - this is normal, use persistent UI instead
+        console.log('Popup not available, using persistent UI:', chrome.runtime.lastError.message);
+      }
+    });
+  } catch (error) {
+    // Ignore errors when popup is not available
+    console.log('Error notifying popup:', error.message);
+  }
+  
+  // PERSISTENT UI: Always update badge and send notifications (even when popup is closed)
+  updatePersistentUI(action, data);
+}
+
+// Update persistent UI (badge + notifications) - works even when popup is closed
+function updatePersistentUI(action, data) {
+  // Update badge based on workflow state
+  if (workflowState.isRunning && !workflowState.isPaused) {
+    const remaining = workflowState.totalTasks - workflowState.completedTasks;
+    if (remaining > 0) {
+      // Show remaining tasks on badge
+      chrome.action.setBadgeText({ text: remaining.toString() });
+      chrome.action.setBadgeBackgroundColor({ color: '#06b6d4' }); // Cyan color
+    } else {
+      chrome.action.setBadgeText({ text: '✓' });
+      chrome.action.setBadgeBackgroundColor({ color: '#10b981' }); // Green for completed
+    }
+  } else if (workflowState.isPaused) {
+    chrome.action.setBadgeText({ text: '⏸' });
+    chrome.action.setBadgeBackgroundColor({ color: '#f59e0b' }); // Orange for paused
+  } else {
+    // Not running - clear badge
+    chrome.action.setBadgeText({ text: '' });
+  }
+  
+  // Send notifications for important events
+  if (action === 'log' && data.type) {
+    const message = data.message || '';
+    
+    // Only notify for important events (not every log)
+    const shouldNotify = 
+      data.type === 'success' && (
+        message.includes('Hoàn thành') || 
+        message.includes('thành công') ||
+        message.includes('tải về')
+      ) ||
+      data.type === 'error' && (
+        message.includes('Lỗi') ||
+        message.includes('Error') ||
+        message.includes('thất bại')
+      ) ||
+      data.type === 'status' ||
+      (action === 'updateProgress' && workflowState.completedTasks > 0 && 
+       workflowState.completedTasks % 5 === 0); // Notify every 5 completed tasks
+    
+    if (shouldNotify) {
+      sendNotification(data.type, message);
+    }
+  } else if (action === 'updateProgress') {
+    // Notify progress milestones
+    const percent = Math.round((workflowState.completedTasks / workflowState.totalTasks) * 100);
+    if (percent > 0 && (percent % 25 === 0 || percent === 100)) {
+      // Notify at 25%, 50%, 75%, 100%
+      sendNotification('info', `Tiến trình: ${workflowState.completedTasks}/${workflowState.totalTasks} (${percent}%)`);
+    }
+  } else if (action === 'status') {
+    // Always notify status changes
+    sendNotification(data.type || 'info', data.message || '');
+  }
+}
+
+// Send Chrome notification
+function sendNotification(type, message) {
+  // Map log types to notification icons
+  const iconMap = {
+    'success': 'icons/icon48.png',
+    'error': 'icons/icon48.png',
+    'warning': 'icons/icon48.png',
+    'info': 'icons/icon48.png'
+  };
+  
+  const title = 'Auto Flow Veo';
+  const iconUrl = iconMap[type] || 'icons/icon48.png';
+  
+  // Truncate message if too long
+  const notificationMessage = message.length > 100 
+    ? message.substring(0, 97) + '...' 
+    : message;
+  
+  chrome.notifications.create({
+    type: 'basic',
+    iconUrl: iconUrl,
+    title: title,
+    message: notificationMessage,
+    priority: type === 'error' ? 2 : (type === 'success' ? 1 : 0)
+  }, (notificationId) => {
+    if (chrome.runtime.lastError) {
+      console.log('Notification error:', chrome.runtime.lastError.message);
+    } else {
+      // Auto-close notification after 5 seconds (except errors)
+      if (type !== 'error') {
+        setTimeout(() => {
+          chrome.notifications.clear(notificationId);
+        }, 5000);
+      }
+    }
   });
 }
 
@@ -400,10 +563,74 @@ function logToPopup(type, message) {
   notifyPopup('log', { type: type, message: message });
 }
 
+function handleDownloadMedia(url, filename, promptIndex) {
+  try {
+    chrome.downloads.download({
+      url: url,
+      filename: filename,
+      saveAs: false // Auto save to Downloads folder
+    }, (downloadId) => {
+      if (chrome.runtime.lastError) {
+        logToPopup('error', `Download failed: ${chrome.runtime.lastError.message}`);
+        notifyPopup('log', { 
+          type: 'error', 
+          message: `Lỗi download: ${chrome.runtime.lastError.message}` 
+        });
+      } else {
+        logToPopup('success', `Đã bắt đầu download: ${filename}`);
+        notifyPopup('log', { 
+          type: 'success', 
+          message: `Đang tải về: ${filename}` 
+        });
+        
+        // Track download ID for completion notification
+        if (downloadId) {
+          // Store download info for tracking
+          if (!workflowState.downloads) {
+            workflowState.downloads = {};
+          }
+          workflowState.downloads[downloadId] = {
+            filename: filename,
+            promptIndex: promptIndex,
+            startTime: Date.now()
+          };
+        }
+      }
+    });
+  } catch (error) {
+    logToPopup('error', `Download error: ${error.message}`);
+    notifyPopup('log', { 
+      type: 'error', 
+      message: `Lỗi khi download: ${error.message}` 
+    });
+  }
+}
+
 // Listen for download completion
 chrome.downloads.onChanged.addListener((downloadDelta) => {
   if (downloadDelta.state && downloadDelta.state.current === 'complete') {
-    // Notify that download completed
-    notifyPopup('log', { type: 'success', message: 'Đã tải về thành công' });
+    const downloadId = downloadDelta.id;
+    
+    // Get download info if tracked
+    if (workflowState.downloads && workflowState.downloads[downloadId]) {
+      const downloadInfo = workflowState.downloads[downloadId];
+      const duration = Math.round((Date.now() - downloadInfo.startTime) / 1000);
+      
+      notifyPopup('log', { 
+        type: 'success', 
+        message: `✓ Đã tải về thành công: ${downloadInfo.filename} (${duration}s)` 
+      });
+      
+      // Clean up
+      delete workflowState.downloads[downloadId];
+    } else {
+      // Generic notification if not tracked
+      notifyPopup('log', { type: 'success', message: '✓ Đã tải về thành công' });
+    }
+  } else if (downloadDelta.state && downloadDelta.state.current === 'interrupted') {
+    notifyPopup('log', { 
+      type: 'error', 
+      message: '⚠ Download bị gián đoạn' 
+    });
   }
 });

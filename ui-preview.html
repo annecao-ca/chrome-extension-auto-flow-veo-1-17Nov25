@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Flow Veo - UI Preview</title>
+  <link rel="stylesheet" href="popup.css">
+  <style>
+    /* Preview specific styles */
+    body {
+      margin: 0;
+      padding: 40px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .preview-container {
+      background: var(--color-bg-secondary);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      width: 100%;
+    }
+
+    .preview-title {
+      text-align: center;
+      color: white;
+      margin-bottom: 30px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-container">
+    <h1 class="preview-title">Auto Flow Veo - UI Preview</h1>
+    
+    <!-- Copy of popup.html content -->
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <h1 class="title">Auto Flow Veo</h1>
+        <div class="header-controls">
+          <button id="langToggle" class="lang-toggle">EN</button>
+        </div>
+      </div>
+
+      <!-- Prompt Input Section -->
+      <div class="section">
+        <label for="promptInput" data-i18n="promptLabel">Danh sách Prompt (mỗi dòng một prompt):</label>
+        <textarea 
+          id="promptInput" 
+          class="prompt-input" 
+          rows="8" 
+          data-i18n="promptPlaceholder"
+          placeholder="Nhập hoặc dán danh sách prompt của bạn..."
+        ></textarea>
+        <div class="input-actions">
+          <button id="importBtn" class="btn-glass btn-glass-secondary ripple" data-i18n="importBtn">
+            <span class="icon">📁</span>
+            Import từ file .txt
+          </button>
+          <input type="file" id="fileInput" accept=".txt" style="display: none;">
+        </div>
+      </div>
+
+      <!-- Type Selection -->
+      <div class="section">
+        <label data-i18n="typeLabel">Chọn loại tạo:</label>
+        <div class="type-buttons">
+          <button id="imageBtn" class="btn-glass btn-glass-secondary btn-type ripple" data-type="image" data-i18n="imageBtn">
+            <span class="icon">🖼️</span>
+            Image
+          </button>
+          <button id="videoBtn" class="btn-glass btn-glass-secondary btn-type ripple" data-type="video" data-i18n="videoBtn">
+            <span class="icon">🎬</span>
+            Video
+          </button>
+        </div>
+        <div id="selectedType" class="selected-type" style="display: none;"></div>
+      </div>
+
+      <!-- Settings Section -->
+      <div class="section settings-section">
+        <div class="settings-header">
+          <label data-i18n="settingsLabel">Cài đặt:</label>
+          <button id="toggleSettings" class="toggle-btn">▼</button>
+        </div>
+        <div id="settingsContent" class="settings-content" style="display: none;">
+          <div class="setting-item">
+            <label for="repeatCount" data-i18n="repeatLabel">Số lần lặp lại mỗi prompt:</label>
+            <input type="number" id="repeatCount" min="1" max="10" value="1" class="setting-input">
+          </div>
+          <div class="setting-item">
+            <label for="startIndex" data-i18n="startIndexLabel">Bắt đầu từ prompt số:</label>
+            <input type="number" id="startIndex" min="1" value="1" class="setting-input">
+          </div>
+          <div class="setting-item">
+            <label for="delayMin" data-i18n="delayMinLabel">Delay tối thiểu (giây):</label>
+            <input type="number" id="delayMin" min="5" value="10" class="setting-input">
+          </div>
+          <div class="setting-item">
+            <label for="delayMax" data-i18n="delayMaxLabel">Delay tối đa (giây):</label>
+            <input type="number" id="delayMax" min="10" value="15" class="setting-input">
+          </div>
+        </div>
+      </div>
+
+      <!-- Control Buttons -->
+      <div class="section">
+        <div class="control-buttons">
+          <button id="startBtn" class="btn-glass btn-glass-primary ripple" disabled data-i18n="startBtn">
+            <span class="icon">▶️</span>
+            Bắt đầu
+          </button>
+          <button id="pauseBtn" class="btn-glass btn-glass-secondary ripple" disabled style="display: none;" data-i18n="pauseBtn">
+            <span class="icon">⏸️</span>
+            Tạm dừng
+          </button>
+          <button id="resumeBtn" class="btn-glass btn-glass-primary ripple" disabled style="display: none;" data-i18n="resumeBtn">
+            <span class="icon">▶️</span>
+            Tiếp tục
+          </button>
+          <button id="stopBtn" class="btn-glass btn-glass-destructive ripple" disabled style="display: none;" data-i18n="stopBtn">
+            <span class="icon">⏹️</span>
+            Dừng
+          </button>
+        </div>
+      </div>
+
+      <!-- Progress Section -->
+      <div class="section">
+        <div class="progress-info">
+          <div class="progress-text">
+            <span data-i18n="progressLabel">Tiến trình:</span>
+            <span id="progressText">0 / 0</span>
+            <span id="progressPercent">(0%)</span>
+          </div>
+          <div class="progress-bar-container">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Log Section -->
+      <div class="section">
+        <div class="log-header">
+          <label data-i18n="logLabel">Log:</label>
+          <button id="clearLogBtn" class="btn-glass btn-glass-secondary btn-glass-sm ripple" data-i18n="clearLogBtn">
+            <span class="icon">🗑️</span>
+            Xóa log
+          </button>
+        </div>
+        <div id="logArea" class="log-area"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="button-effects.js"></script>
+</script>
+</body>
+</html>
+
