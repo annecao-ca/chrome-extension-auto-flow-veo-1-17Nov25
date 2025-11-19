@@ -46,12 +46,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   setSectionLoading(document.querySelector('.container'), true);
   
   try {
-    await loadSavedState();
+    // Load saved state with fallback
+    try {
+      await loadSavedState();
+    } catch (stateError) {
+      console.warn('Could not load saved state, using defaults:', stateError);
+      // Continue with default state
+    }
+
     await loadAndApplySettings();
     await syncStateFromBackground();
     updateUI();
     checkEmptyStates(); // Check empty states after initialization
   } catch (error) {
+    console.error('Initialization error:', error);
     if (typeof toastManager !== 'undefined') {
       toastManager.error('Lỗi khi khởi tạo: ' + error.message);
     }
@@ -505,12 +513,23 @@ function showStatus(type, message) {
 }
 
 async function loadSavedState() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     chrome.storage.local.get(['state'], (result) => {
-      if (result.state) {
-        Object.assign(state, result.state);
+      if (chrome.runtime.lastError) {
+        console.error('Error loading state:', chrome.runtime.lastError);
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
       }
-      resolve();
+
+      try {
+        if (result.state) {
+          Object.assign(state, result.state);
+        }
+        resolve();
+      } catch (error) {
+        console.error('Error parsing saved state:', error);
+        reject(error);
+      }
     });
   });
 }

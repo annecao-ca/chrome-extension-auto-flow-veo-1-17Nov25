@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Auto Flow Veo - Batch Image/Video Creator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Tự động hóa tạo hình ảnh và video hàng loạt trên Google Flow/Veo3",
   "permissions": [
     "activeTab",
@@ -34,10 +34,20 @@
         "https://*.flow.google.com/*",
         "https://labs.google/*"
       ],
-      "js": ["utils.js", "content.js"],
+      "js": [
+        "constants.js",
+        "utils.js",
+        "content/dom-helpers.js",
+        "content/prompt-filler.js",
+        "content/monitor.js",
+        "content/main.js"
+      ],
       "run_at": "document_idle"
     }
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

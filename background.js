@@ -241,47 +241,58 @@ async function processNext() {
   
   // Helper function to check if URL is Google Flow/Veo3
   function isFlowUrl(url) {
-    if (!url) return false;
-    const urlLower = url.toLowerCase();
-    // Check for flow.google.com
-    if (urlLower.includes('flow.google.com')) return true;
-    // Check for labs.google with /flow/ or /fx/vi/tools/flow/
-    if (urlLower.includes('labs.google') && (urlLower.includes('/flow/') || urlLower.includes('/fx/') || urlLower.includes('/tools/flow'))) return true;
-    // Check for any google.com with flow in path
-    if (urlLower.includes('google.com') && urlLower.includes('/flow')) return true;
-    return false;
+    try {
+      if (!url || typeof url !== 'string') return false;
+      const urlLower = url.toLowerCase();
+      // Check for flow.google.com
+      if (urlLower.includes('flow.google.com')) return true;
+      // Check for labs.google with /flow/ or /fx/vi/tools/flow/
+      if (urlLower.includes('labs.google') && (urlLower.includes('/flow/') || urlLower.includes('/fx/') || urlLower.includes('/tools/flow'))) return true;
+      // Check for any google.com with flow in path
+      if (urlLower.includes('google.com') && urlLower.includes('/flow')) return true;
+      return false;
+    } catch (error) {
+      console.error('Error checking URL:', error);
+      return false;
+    }
   }
   
   // Find Google Flow/Veo3 tab
   let tab = null;
-  
-  // Strategy 1: Check active tab first
-  let activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (activeTabs.length > 0 && isFlowUrl(activeTabs[0].url)) {
-    tab = activeTabs[0];
-    logToPopup('info', 'Đã tìm thấy tab Google Flow/Veo3 (active tab)');
-  } else {
-    // Strategy 2: Search all tabs in current window
-    let allTabs = await chrome.tabs.query({ currentWindow: true });
-    for (const t of allTabs) {
-      if (isFlowUrl(t.url)) {
-        tab = t;
-        logToPopup('info', 'Đã tìm thấy tab Google Flow/Veo3 trong cửa sổ hiện tại');
-        break;
-      }
-    }
-    
-    // Strategy 3: Search all tabs in all windows
-    if (!tab) {
-      allTabs = await chrome.tabs.query({});
+
+  try {
+    // Strategy 1: Check active tab first
+    let activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (activeTabs.length > 0 && isFlowUrl(activeTabs[0].url)) {
+      tab = activeTabs[0];
+      logToPopup('info', 'Đã tìm thấy tab Google Flow/Veo3 (active tab)');
+    } else {
+      // Strategy 2: Search all tabs in current window
+      let allTabs = await chrome.tabs.query({ currentWindow: true });
       for (const t of allTabs) {
         if (isFlowUrl(t.url)) {
           tab = t;
-          logToPopup('info', 'Đã tìm thấy tab Google Flow/Veo3 trong tất cả cửa sổ');
+          logToPopup('info', 'Đã tìm thấy tab Google Flow/Veo3 trong cửa sổ hiện tại');
           break;
         }
       }
+
+      // Strategy 3: Search all tabs in all windows
+      if (!tab) {
+        allTabs = await chrome.tabs.query({});
+        for (const t of allTabs) {
+          if (isFlowUrl(t.url)) {
+            tab = t;
+            logToPopup('info', 'Đã tìm thấy tab Google Flow/Veo3 trong tất cả cửa sổ');
+            break;
+          }
+        }
+      }
     }
+  } catch (error) {
+    console.error('Error querying tabs:', error);
+    logToPopup('error', `Lỗi khi tìm tab: ${error.message}`);
+  }
     
     // NOTE: KHÔNG tự động activate tab - để user có thể làm việc ở tab khác
     // Extension sẽ tiếp tục chạy trong background, không cần tab phải active
