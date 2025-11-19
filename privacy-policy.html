@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Auto Flow Veo Extension</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #2563eb;
+      margin-bottom: 10px;
+      font-size: 32px;
+    }
+
+    h2 {
+      color: #1e40af;
+      margin-top: 30px;
+      margin-bottom: 15px;
+      font-size: 24px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 8px;
+    }
+
+    h3 {
+      color: #374151;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+
+    p, li {
+      margin-bottom: 12px;
+      color: #4b5563;
+    }
+
+    ul {
+      margin-left: 20px;
+      margin-bottom: 20px;
+    }
+
+    .highlight {
+      background: #dbeafe;
+      padding: 15px;
+      border-left: 4px solid #2563eb;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+
+    .section {
+      margin-bottom: 30px;
+    }
+
+    .permission-box {
+      background: #f9fafb;
+      padding: 20px;
+      border-radius: 6px;
+      margin: 15px 0;
+      border: 1px solid #e5e7eb;
+    }
+
+    .check {
+      color: #10b981;
+      font-weight: bold;
+    }
+
+    .date {
+      color: #6b7280;
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Privacy Policy</h1>
+    <p class="date"><strong>Last Updated:</strong> November 19, 2025</p>
+
+    <div class="highlight">
+      <p><strong>TL;DR (Too Long; Didn't Read):</strong></p>
+      <p>Auto Flow Veo Extension <strong>does NOT collect, store, or transmit any personal data</strong>. All your settings and prompts are stored locally on your device. We respect your privacy.</p>
+    </div>
+
+    <div class="section">
+      <h2>1. Introduction</h2>
+      <p>Auto Flow Veo Extension ("we", "our", or "the Extension") is a Chrome browser extension designed to automate batch image and video creation on Google Flow/Veo3. This Privacy Policy explains how we handle your information.</p>
+    </div>
+
+    <div class="section">
+      <h2>2. Information We Collect</h2>
+      <p><strong>None.</strong> We do not collect any personal information, usage data, or analytics.</p>
+
+      <h3>What is stored locally:</h3>
+      <ul>
+        <li>Your extension settings (repeat count, delays, start index)</li>
+        <li>Your prompt lists</li>
+        <li>Workflow state (for pause/resume functionality)</li>
+        <li>Language preference (Vietnamese/English)</li>
+      </ul>
+
+      <p class="check">✓ All data is stored locally using Chrome's storage API</p>
+      <p class="check">✓ No data is sent to external servers</p>
+      <p class="check">✓ No data is shared with third parties</p>
+    </div>
+
+    <div class="section">
+      <h2>3. Permissions Explained</h2>
+      <p>The Extension requires certain Chrome permissions to function. Here's why:</p>
+
+      <div class="permission-box">
+        <h3>activeTab</h3>
+        <p><strong>Purpose:</strong> Interact with the currently active Google Flow/Veo3 tab</p>
+        <p><strong>Usage:</strong> Send automation commands to the active tab</p>
+        <p><strong>Data Access:</strong> None - only interacts with flow.google.com pages</p>
+      </div>
+
+      <div class="permission-box">
+        <h3>storage</h3>
+        <p><strong>Purpose:</strong> Save your settings and prompt lists</p>
+        <p><strong>Usage:</strong> Store preferences locally on your device</p>
+        <p><strong>Data Access:</strong> Local only - never transmitted</p>
+      </div>
+
+      <div class="permission-box">
+        <h3>downloads</h3>
+        <p><strong>Purpose:</strong> Automatically download generated media</p>
+        <p><strong>Usage:</strong> Save images/videos to your Downloads folder</p>
+        <p><strong>Data Access:</strong> Media files from Flow/Veo3 only</p>
+      </div>
+
+      <div class="permission-box">
+        <h3>tabs</h3>
+        <p><strong>Purpose:</strong> Find Google Flow/Veo3 tabs</p>
+        <p><strong>Usage:</strong> Locate tabs with flow.google.com or labs.google URLs</p>
+        <p><strong>Data Access:</strong> Only tab URLs, no content</p>
+      </div>
+
+      <div class="permission-box">
+        <h3>scripting</h3>
+        <p><strong>Purpose:</strong> Inject automation scripts</p>
+        <p><strong>Usage:</strong> Automate prompt filling and button clicking on Flow/Veo3</p>
+        <p><strong>Data Access:</strong> Only on flow.google.com and labs.google domains</p>
+      </div>
+
+      <div class="permission-box">
+        <h3>notifications</h3>
+        <p><strong>Purpose:</strong> Show completion notifications</p>
+        <p><strong>Usage:</strong> Alert you when batch processing is complete</p>
+        <p><strong>Data Access:</strong> None</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>4. Data Usage</h2>
+      <p>The Extension uses your data solely for its intended functionality:</p>
+      <ul>
+        <li>Storing settings for your convenience</li>
+        <li>Automating prompt submission to Google Flow/Veo3</li>
+        <li>Downloading generated media to your device</li>
+        <li>Tracking batch processing progress</li>
+      </ul>
+      <p><strong>We do NOT:</strong></p>
+      <ul>
+        <li>❌ Send your prompts or settings to any server</li>
+        <li>❌ Track your usage or behavior</li>
+        <li>❌ Collect analytics or telemetry</li>
+        <li>❌ Share data with third parties</li>
+        <li>❌ Use cookies or tracking technologies</li>
+        <li>❌ Access your personal information</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>5. Third-Party Services</h2>
+      <p>The Extension interacts with Google Flow/Veo3 (flow.google.com and labs.google) to automate media generation. Your use of Google Flow/Veo3 is subject to Google's own Terms of Service and Privacy Policy.</p>
+      <p><strong>We are not affiliated with Google.</strong> This is an independent automation tool.</p>
+    </div>
+
+    <div class="section">
+      <h2>6. Data Security</h2>
+      <p>All data is stored securely using Chrome's built-in storage API:</p>
+      <ul>
+        <li>Data is encrypted by Chrome</li>
+        <li>Data is sandboxed per extension</li>
+        <li>Data is only accessible by the Extension</li>
+        <li>Content Security Policy (CSP) is enforced</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>7. Data Retention</h2>
+      <p>Your data is retained until:</p>
+      <ul>
+        <li>You manually clear it in the Extension</li>
+        <li>You uninstall the Extension</li>
+        <li>You clear Chrome's extension data</li>
+      </ul>
+      <p>No data persists after uninstallation.</p>
+    </div>
+
+    <div class="section">
+      <h2>8. Children's Privacy</h2>
+      <p>The Extension is not directed at children under 13. We do not knowingly collect information from children.</p>
+    </div>
+
+    <div class="section">
+      <h2>9. Changes to This Policy</h2>
+      <p>We may update this Privacy Policy from time to time. Changes will be posted on this page with an updated "Last Updated" date.</p>
+      <p>Continued use of the Extension after changes constitutes acceptance of the updated policy.</p>
+    </div>
+
+    <div class="section">
+      <h2>10. Your Rights</h2>
+      <p>Since we don't collect any data, there is no data to access, correct, or delete. You can:</p>
+      <ul>
+        <li>Clear Extension storage via Chrome settings</li>
+        <li>Uninstall the Extension at any time</li>
+        <li>Review the source code (open source)</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>11. Contact</h2>
+      <p>If you have questions about this Privacy Policy or the Extension:</p>
+      <ul>
+        <li><strong>GitHub:</strong> <a href="https://github.com/annecao-ca/chrome-extension-auto-flow-veo-1-17Nov25" target="_blank">Report an issue</a></li>
+        <li><strong>Email:</strong> [Your Email Address]</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>12. Compliance</h2>
+      <p>This Extension complies with:</p>
+      <ul>
+        <li>Chrome Web Store Developer Program Policies</li>
+        <li>Google's Extension Quality Guidelines</li>
+        <li>GDPR requirements (EU)</li>
+        <li>CCPA requirements (California)</li>
+      </ul>
+    </div>
+
+    <div class="footer">
+      <p><strong>Auto Flow Veo Extension v1.0.1</strong></p>
+      <p>© 2025 - Open Source Project</p>
+      <p><a href="https://github.com/annecao-ca/chrome-extension-auto-flow-veo-1-17Nov25" target="_blank">View Source Code</a></p>
+    </div>
+  </div>
+</body>
+</html>
