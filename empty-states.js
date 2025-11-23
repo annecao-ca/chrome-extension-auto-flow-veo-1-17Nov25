@@ -292,13 +292,14 @@ class EmptyStateManager {
    */
   handleAction(action, href = null) {
     switch (action) {
-      case 'import':
+      case 'import': {
         // Trigger file import
         const fileInput = document.getElementById('fileInput');
         if (fileInput) {
           fileInput.click();
         }
         break;
+      }
 
       case 'open-flow':
         // Open Google Flow in new tab
@@ -309,7 +310,7 @@ class EmptyStateManager {
         }
         break;
 
-      case 'open-settings':
+      case 'open-settings': {
         // Scroll to settings or open settings page
         const settingsSection = document.querySelector('.settings-section');
         if (settingsSection) {
@@ -323,6 +324,7 @@ class EmptyStateManager {
           }
         }
         break;
+      }
 
       case 'clear-filters':
         // Clear filters (implement based on your app)

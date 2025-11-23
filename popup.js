@@ -29,7 +29,9 @@ const elements = {
   clearLogBtn: null,
   toggleSettings: null,
   settingsContent: null,
-  statusMessage: null
+  statusMessage: null,
+  openDownloadSettings: null,
+  autoDownloadStatus: null
 };
 
 // Initialize
@@ -49,6 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadSavedState();
     await loadAndApplySettings();
     await syncStateFromBackground();
+    await loadAutoDownloadState(); // Load auto-download checkbox state
     updateUI();
     checkEmptyStates(); // Check empty states after initialization
   } catch (error) {
@@ -147,6 +150,8 @@ function initializeElements() {
   elements.toggleSettings = document.getElementById('toggleSettings');
   elements.settingsContent = document.getElementById('settingsContent');
   elements.statusMessage = document.getElementById('statusMessage');
+  elements.openDownloadSettings = document.getElementById('openDownloadSettings');
+  elements.autoDownloadStatus = document.getElementById('autoDownloadStatus');
 }
 
 function attachEventListeners() {
@@ -223,6 +228,52 @@ function attachEventListeners() {
     updateUI();
     checkEmptyStates();
   });
+  
+  elements.openDownloadSettings?.addEventListener('click', () => {
+    chrome.tabs.create({ url: 'chrome://settings/downloads' });
+  });
+  
+  // Auto-download checkbox: Toggle auto-download setting on Flow website
+  elements.autoDownloadStatus?.addEventListener('change', async (e) => {
+    const enabled = e.target.checked;
+    
+    // Save state to storage
+    try {
+      await chrome.storage.local.set({ autoDownloadEnabled: enabled });
+    } catch (error) {
+      console.error('Error saving auto-download state:', error);
+    }
+    
+    // Send message to content script to toggle auto-download on Flow website
+    try {
+      // Get active tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab && tab.url && (tab.url.includes('flow') || tab.url.includes('veo'))) {
+        chrome.tabs.sendMessage(tab.id, {
+          action: 'toggleAutoDownload',
+          enabled: enabled
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.log('Could not send message to content script:', chrome.runtime.lastError.message);
+            // Show message to user
+            if (typeof toastManager !== 'undefined') {
+              toastManager.warning('Vui lòng mở trang Google Flow/Veo3 để bật/tắt tự động tải video');
+            }
+          } else if (response && response.success) {
+            if (typeof toastManager !== 'undefined') {
+              toastManager.success(enabled ? 'Đã bật tự động tải video' : 'Đã tắt tự động tải video');
+            }
+          }
+        });
+      } else {
+        if (typeof toastManager !== 'undefined') {
+          toastManager.warning('Vui lòng mở trang Google Flow/Veo3 để bật/tắt tự động tải video');
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling auto-download:', error);
+    }
+  });
 }
 
 // Check and show empty states
@@ -252,8 +303,11 @@ function checkEmptyStates() {
       if (progressSection) {
         emptyStateManager.show(progressSection, EMPTY_STATE_TYPES.NO_PROGRESS, { compact: true });
       }
-    } else if (elements.progressBar?.closest('.section')) {
-      emptyStateManager.hide(elements.progressBar.closest('.section'));
+    } else if (elements.progressBar) {
+      const progressSection = elements.progressBar.closest('.section');
+      if (progressSection) {
+        emptyStateManager.hide(progressSection);
+      }
     }
   }
 }
@@ -435,37 +489,50 @@ function handleStop() {
 function updateUI() {
   // Update start button
   const canStart = state.prompts.length > 0 && state.selectedType && !state.isProcessing;
-  elements.startBtn.disabled = !canStart;
+  if (elements.startBtn) {
+    elements.startBtn.disabled = !canStart;
+  }
   
   // Update control buttons visibility
   if (state.isProcessing) {
-    elements.startBtn.style.display = 'none';
-    elements.pauseBtn.style.display = state.isPaused ? 'none' : 'inline-block';
-    elements.resumeBtn.style.display = state.isPaused ? 'inline-block' : 'none';
-    elements.stopBtn.style.display = 'inline-block';
-    elements.pauseBtn.disabled = false;
-    elements.resumeBtn.disabled = false;
-    elements.stopBtn.disabled = false;
+    if (elements.startBtn) elements.startBtn.style.display = 'none';
+    if (elements.pauseBtn) {
+      elements.pauseBtn.style.display = state.isPaused ? 'none' : 'inline-block';
+      elements.pauseBtn.disabled = false;
+    }
+    if (elements.resumeBtn) {
+      elements.resumeBtn.style.display = state.isPaused ? 'inline-block' : 'none';
+      elements.resumeBtn.disabled = false;
+    }
+    if (elements.stopBtn) {
+      elements.stopBtn.style.display = 'inline-block';
+      elements.stopBtn.disabled = false;
+    }
   } else {
-    elements.startBtn.style.display = 'inline-block';
-    elements.pauseBtn.style.display = 'none';
-    elements.resumeBtn.style.display = 'none';
-    elements.stopBtn.style.display = 'none';
+    if (elements.startBtn) elements.startBtn.style.display = 'inline-block';
+    if (elements.pauseBtn) elements.pauseBtn.style.display = 'none';
+    if (elements.resumeBtn) elements.resumeBtn.style.display = 'none';
+    if (elements.stopBtn) elements.stopBtn.style.display = 'none';
   }
   
   // Update progress
   const percent = state.totalTasks > 0 
     ? Math.round((state.completedTasks / state.totalTasks) * 100) 
     : 0;
-  elements.progressText.textContent = `${state.completedTasks} / ${state.totalTasks}`;
-  elements.progressPercent.textContent = `(${percent}%)`;
-  elements.progressBar.style.width = `${percent}%`;
-  
-  // Add active class to progress bar when processing
-  if (state.isProcessing && !state.isPaused) {
-    elements.progressBar.classList.add('active');
-  } else {
-    elements.progressBar.classList.remove('active');
+  if (elements.progressText) {
+    elements.progressText.textContent = `${state.completedTasks} / ${state.totalTasks}`;
+  }
+  if (elements.progressPercent) {
+    elements.progressPercent.textContent = `(${percent}%)`;
+  }
+  if (elements.progressBar) {
+    elements.progressBar.style.width = `${percent}%`;
+    // Add active class to progress bar when processing
+    if (state.isProcessing && !state.isPaused) {
+      elements.progressBar.classList.add('active');
+    } else {
+      elements.progressBar.classList.remove('active');
+    }
   }
 
   // Check empty states
@@ -553,8 +620,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // Fallback to old method
       showStatus(message.type, message.message);
     }
+  } else if (message.action === 'autoDownloadStatus') {
+    if (elements.autoDownloadStatus) {
+      elements.autoDownloadStatus.checked = !!message.enabled;
+      elements.autoDownloadStatus.indeterminate = false;
+      // Save state to storage
+      chrome.storage.local.set({ autoDownloadEnabled: !!message.enabled }).catch(() => {});
+    }
   }
 });
+
+// Load auto-download checkbox state from storage
+async function loadAutoDownloadState() {
+  try {
+    const result = await chrome.storage.local.get(['autoDownloadEnabled']);
+    if (elements.autoDownloadStatus && result.autoDownloadEnabled !== undefined) {
+      elements.autoDownloadStatus.checked = !!result.autoDownloadEnabled;
+    }
+  } catch (error) {
+    console.error('Error loading auto-download state:', error);
+  }
+}
 
 // Check network connection
 function checkNetworkConnection() {

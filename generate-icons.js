@@ -55,6 +55,6 @@ try {
   
   console.log('All icons generated successfully!');
 } catch (error) {
-  console.log('Canvas package not found. Use generate-icons.html instead.');
+  console.log('Canvas package not found. Use generate-icons.html instead.', error?.message || '');
 }
 

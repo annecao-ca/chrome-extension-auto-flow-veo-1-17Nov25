@@ -14,6 +14,11 @@ let workflowState = {
   queue: [],
   downloads: {} // Track active downloads
 };
+const autoDownloadEnsuredTabs = new Set();
+// Track downloaded filenames (base name without numbers) to prevent duplicates
+const downloadedFilenames = new Set();
+// Track active downloads by filename pattern
+const activeDownloads = new Map(); // filename pattern -> downloadId
 
 // Keep service worker alive by listening to events
 chrome.runtime.onInstalled.addListener(() => {
@@ -62,6 +67,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === 'downloadMedia') {
     handleDownloadMedia(message.url, message.filename, message.promptIndex);
     sendResponse({ success: true });
+    return true; // Keep channel open for async response
+  } else if (message.action === 'autoDownloadStatus') {
+    // Forward auto download status to popup
+    notifyPopup('autoDownloadStatus', { enabled: message.enabled });
+    sendResponse({ success: true });
   }
   
   return true; // Keep channel open for async response
@@ -85,6 +95,12 @@ function handleStart(message) {
   
   // Build queue
   buildQueue();
+  autoDownloadEnsuredTabs.clear();
+  
+  // CRITICAL: Clear downloaded filenames tracking when starting new workflow
+  // Only clear if user wants fresh start (optional - comment out if you want to prevent duplicates across sessions)
+  // downloadedFilenames.clear();
+  activeDownloads.clear();
   
   // Update persistent UI - show badge
   updatePersistentUI('status', { 
@@ -143,6 +159,7 @@ function handleStop() {
   workflowState.isRunning = false;
   workflowState.isPaused = false;
   workflowState.queue = [];
+  autoDownloadEnsuredTabs.clear();
   
   // Clear badge
   chrome.action.setBadgeText({ text: '' });
@@ -406,6 +423,29 @@ async function processNext() {
     return;
   }
   
+  // Ensure Flow auto-download setting is enabled once per tab (only if checkbox is checked)
+  if (!autoDownloadEnsuredTabs.has(tab.id)) {
+    try {
+      // Check if auto-download is enabled in settings
+      const storage = await chrome.storage.local.get(['autoDownloadEnabled']);
+      const autoDownloadEnabled = storage.autoDownloadEnabled !== false; // Default to true if not set
+      
+      if (autoDownloadEnabled) {
+        const response = await chrome.tabs.sendMessage(tab.id, { action: 'ensureAutoDownload' });
+        if (response && response.success) {
+          autoDownloadEnsuredTabs.add(tab.id);
+          logToPopup('success', 'Đã bật tự động tải video trên Flow');
+        } else {
+          logToPopup('warning', 'Không thể bật tự động tải video trên Flow. Vui lòng kiểm tra thủ công.');
+        }
+      } else {
+        logToPopup('info', 'Tự động tải video đã được tắt trong cài đặt. Vui lòng bật checkbox để sử dụng.');
+      }
+    } catch (error) {
+      logToPopup('warning', `Không thể gọi auto download: ${error.message}`);
+    }
+  }
+  
   // Send message to content script with enhanced settings
   try {
     await chrome.tabs.sendMessage(tab.id, {
@@ -565,19 +605,50 @@ function logToPopup(type, message) {
 
 function handleDownloadMedia(url, filename, promptIndex) {
   try {
+    console.log('[Background] handleDownloadMedia called:', { url: url.substring(0, 50), filename, promptIndex });
+    
+    // Extract base filename (remove numbers like (1), (2), etc.)
+    const baseFilename = filename.replace(/\s*\(\d+\)\.[^.]+$/, '').replace(/\.[^.]+$/, '');
+    console.log('[Background] Base filename:', baseFilename);
+    console.log('[Background] Downloaded filenames:', Array.from(downloadedFilenames));
+    console.log('[Background] Active downloads:', Array.from(activeDownloads.keys()));
+    
+    // CRITICAL: Check if we've already downloaded this file
+    if (downloadedFilenames.has(baseFilename)) {
+      console.log('[Background] ⚠️ DUPLICATE - Bỏ qua:', filename, 'base:', baseFilename);
+      logToPopup('warning', `⚠️ Bỏ qua duplicate download: ${filename} (đã download: ${baseFilename})`);
+      return; // Don't download duplicate
+    }
+    
+    // Check if there's an active download with the same base name
+    if (activeDownloads.has(baseFilename)) {
+      console.log('[Background] ⚠️ ACTIVE DUPLICATE - Bỏ qua:', filename, 'base:', baseFilename);
+      logToPopup('warning', `⚠️ Bỏ qua duplicate download: ${filename} (đang download: ${baseFilename})`);
+      return; // Don't download duplicate
+    }
+    
+    console.log('[Background] ✅ New download starting:', filename);
+    logToPopup('info', `📥 Bắt đầu download: ${filename}`);
+    logToPopup('info', `URL: ${url.substring(0, 100)}...`);
+    
+    // Mark as downloading BEFORE starting download
+    downloadedFilenames.add(baseFilename);
+    console.log('[Background] Added to downloadedFilenames:', baseFilename);
+    
     chrome.downloads.download({
       url: url,
       filename: filename,
       saveAs: false // Auto save to Downloads folder
     }, (downloadId) => {
       if (chrome.runtime.lastError) {
-        logToPopup('error', `Download failed: ${chrome.runtime.lastError.message}`);
+        const errorMsg = chrome.runtime.lastError.message;
+        logToPopup('error', `Download failed: ${errorMsg}`);
         notifyPopup('log', { 
           type: 'error', 
-          message: `Lỗi download: ${chrome.runtime.lastError.message}` 
+          message: `Lỗi download: ${errorMsg}` 
         });
       } else {
-        logToPopup('success', `Đã bắt đầu download: ${filename}`);
+        logToPopup('success', `✓ Đã bắt đầu download: ${filename} (ID: ${downloadId})`);
         notifyPopup('log', { 
           type: 'success', 
           message: `Đang tải về: ${filename}` 
@@ -591,9 +662,13 @@ function handleDownloadMedia(url, filename, promptIndex) {
           }
           workflowState.downloads[downloadId] = {
             filename: filename,
+            baseFilename: baseFilename,
             promptIndex: promptIndex,
             startTime: Date.now()
           };
+          
+          // Track active download
+          activeDownloads.set(baseFilename, downloadId);
         }
       }
     });
@@ -605,6 +680,81 @@ function handleDownloadMedia(url, filename, promptIndex) {
     });
   }
 }
+
+// CRITICAL: Intercept downloads BEFORE they start to prevent duplicates
+chrome.downloads.onCreated.addListener(async (downloadItem) => {
+  try {
+    console.log('[Background] Download created:', downloadItem);
+    
+    // Get filename without path
+    const filename = downloadItem.filename.split('/').pop() || downloadItem.filename;
+    console.log('[Background] Filename:', filename);
+    
+    // Extract base filename (remove numbers like (1), (2), etc.)
+    // Pattern: filename like "A_designers_hand_202511182029 (1).jpeg" -> "A_designers_hand_202511182029"
+    const baseFilename = filename.replace(/\s*\(\d+\)\.[^.]+$/, '').replace(/\.[^.]+$/, '');
+    console.log('[Background] Base filename:', baseFilename);
+    console.log('[Background] Downloaded filenames:', Array.from(downloadedFilenames));
+    console.log('[Background] Active downloads:', Array.from(activeDownloads.keys()));
+    
+    // RELAXED DUPLICATE DETECTION:
+    // We no longer cancel downloads based on history to avoid blocking valid downloads.
+    // Chrome will automatically handle duplicates by appending (1), (2), etc.
+    
+    /* 
+    // Check if we've already downloaded this file (by base name)
+    if (downloadedFilenames.has(baseFilename)) {
+      console.log('[Background] DUPLICATE DETECTED! Canceling:', filename);
+      logToPopup('warning', `⚠️ Phát hiện duplicate download: ${filename}, đang hủy...`);
+      
+      // Cancel this duplicate download immediately
+      try {
+        await chrome.downloads.cancel(downloadItem.id);
+        console.log('[Background] ✅ Đã hủy duplicate download:', filename);
+        logToPopup('success', `✅ Đã hủy duplicate download: ${filename}`);
+        return; // Don't process this download
+      } catch (cancelError) {
+        console.error('[Background] ❌ Không thể hủy download:', cancelError);
+        logToPopup('error', `❌ Không thể hủy download: ${cancelError.message}`);
+      }
+    }
+    */
+    
+    // Check if there's an active download with the same base name
+    if (activeDownloads.has(baseFilename)) {
+      const existingDownloadId = activeDownloads.get(baseFilename);
+      // Only cancel if it's literally the same file being downloaded twice at the exact same time
+      // But usually we should let Chrome handle it
+      console.log('[Background] Active download with same name exists:', filename, 'existing:', existingDownloadId);
+      
+      /*
+      console.log('[Background] DUPLICATE ACTIVE DOWNLOAD! Canceling:', filename, 'existing:', existingDownloadId);
+      logToPopup('warning', `⚠️ Phát hiện duplicate download đang diễn ra: ${filename}, đang hủy...`);
+      
+      // Cancel this duplicate download
+      try {
+        await chrome.downloads.cancel(downloadItem.id);
+        console.log('[Background] ✅ Đã hủy duplicate active download:', filename);
+        logToPopup('success', `✅ Đã hủy duplicate download: ${filename}`);
+        return;
+      } catch (cancelError) {
+        console.error('[Background] ❌ Không thể hủy download:', cancelError);
+        logToPopup('error', `❌ Không thể hủy download: ${cancelError.message}`);
+      }
+      */
+    }
+    
+    // This is a new download, track it
+    downloadedFilenames.add(baseFilename);
+    activeDownloads.set(baseFilename, downloadItem.id);
+    
+    console.log('[Background] ✅ New download tracked:', filename, 'base:', baseFilename);
+    logToPopup('info', `📥 Đang download: ${filename}`);
+  } catch (error) {
+    console.error('[Background] ❌ Lỗi khi intercept download:', error);
+    logToPopup('error', `❌ Lỗi khi intercept download: ${error.message}`);
+  }
+});
 
 // Listen for download completion
 chrome.downloads.onChanged.addListener((downloadDelta) => {
@@ -627,10 +777,27 @@ chrome.downloads.onChanged.addListener((downloadDelta) => {
       // Generic notification if not tracked
       notifyPopup('log', { type: 'success', message: '✓ Đã tải về thành công' });
     }
+    
+    // Clean up active downloads tracking
+    // Find and remove from activeDownloads
+    for (const [baseFilename, id] of activeDownloads.entries()) {
+      if (id === downloadId) {
+        activeDownloads.delete(baseFilename);
+        break;
+      }
+    }
   } else if (downloadDelta.state && downloadDelta.state.current === 'interrupted') {
     notifyPopup('log', { 
       type: 'error', 
       message: '⚠ Download bị gián đoạn' 
     });
+    
+    // Clean up active downloads tracking
+    for (const [baseFilename, id] of activeDownloads.entries()) {
+      if (id === downloadDelta.id) {
+        activeDownloads.delete(baseFilename);
+        break;
+      }
+    }
   }
 });

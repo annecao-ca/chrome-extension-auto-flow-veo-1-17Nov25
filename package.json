@@ -1,0 +1,27 @@
+{
+  "name": "chrome-extension-auto-flow-veo-1-17nov25",
+  "version": "1.0.0",
+  "description": "Chrome Extension tự động hóa việc tạo hình ảnh và video hàng loạt trên Google Flow/Veo3.",
+  "main": "background.js",
+  "scripts": {
+    "lint": "eslint background.js content.js",
+    "test": "echo \"No automated tests yet; run npm run lint\" && exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/annecao-ca/chrome-extension-auto-flow-veo-1-17Nov25.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/annecao-ca/chrome-extension-auto-flow-veo-1-17Nov25/issues"
+  },
+  "homepage": "https://github.com/annecao-ca/chrome-extension-auto-flow-veo-1-17Nov25#readme",
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "globals": "^16.5.0"
+  }
+}
