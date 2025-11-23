@@ -3,7 +3,7 @@
   "name": "Auto Flow Veo - Batch Image/Video Creator",
   "version": "1.0.1",
   "description": "Tự động hóa tạo hình ảnh và video hàng loạt trên Google Flow/Veo3",
-  "privacy_policy": "https://annecao.ca/privacy-policy.html",
+  "privacy_policy": "https://annecao-ca.github.io/chrome-extension-auto-flow-veo-1-17Nov25/privacy-policy.html",
   "permissions": [
     "activeTab",
     "storage",
